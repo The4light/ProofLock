@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/theme';
 import api from '../services/api';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function NewCommitmentModal() {
   const router = useRouter();
@@ -23,22 +24,39 @@ export default function NewCommitmentModal() {
   const [selectedDate, setSelectedDate] = useState<'today' | 'tomorrow'>('today');
   const [loading, setLoading] = useState(false);
 
-  // Time state (simplifying for the UI demo, usually you'd use a Picker)
-  const [time, setTime] = useState('06:30');
-  const [ampm, setAmpm] = useState('AM');
+  // Time State
+  const [date, setDate] = useState(new Date()); 
+  const [showPicker, setShowPicker] = useState(false);
+
+  const onTimeChange = (event: any, selectedDateValue?: Date) => {
+    setShowPicker(false); 
+    if (selectedDateValue) {
+      setDate(selectedDateValue);
+    }
+  };
+
+  const formatTime = (timeToFormat: Date) => {
+    return timeToFormat.toLocaleTimeString([], { 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      hour12: true 
+    }).toUpperCase();
+  };
 
   const handleCreateCommitment = async () => {
     if (!goal) return Alert.alert("Hold up", "What is the goal for this commitment?");
     
     setLoading(true);
     try {
-      const date = new Date();
-      if (selectedDate === 'tomorrow') date.setDate(date.getDate() + 1);
+      const finalDate = new Date(date);
+      if (selectedDate === 'tomorrow') {
+        finalDate.setDate(finalDate.getDate() + 1);
+      }
 
       const response = await api.post('/alarms', {
         goal,
-        startTime: `${time} ${ampm}`,
-        startDate: date,
+        startTime: formatTime(finalDate),
+        startDate: finalDate,
         proofMethod,
         status: 'upcoming'
       });
@@ -51,6 +69,13 @@ export default function NewCommitmentModal() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // UI Date Helper
+  const getDisplayDate = (type: 'today' | 'tomorrow') => {
+    const d = new Date();
+    if (type === 'tomorrow') d.setDate(d.getDate() + 1);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
   return (
@@ -95,24 +120,38 @@ export default function NewCommitmentModal() {
               onPress={() => setSelectedDate('today')}
             >
               <Text style={[styles.dateBtnText, selectedDate === 'today' && styles.textBlack]}>TODAY</Text>
-              <Text style={[styles.dateSubtext, selectedDate === 'today' && styles.textBlack]}>Oct 24</Text>
+              <Text style={[styles.dateSubtext, selectedDate === 'today' && styles.textBlack]}>{getDisplayDate('today')}</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
               style={[styles.dateBtn, selectedDate === 'tomorrow' && styles.dateBtnActive]}
               onPress={() => setSelectedDate('tomorrow')}
             >
-              <Text style={styles.dateBtnText}>TOMORROW</Text>
-              <Text style={styles.dateSubtext}>Oct 25</Text>
+              <Text style={[styles.dateBtnText, selectedDate === 'tomorrow' && styles.textBlack]}>TOMORROW</Text>
+              <Text style={[styles.dateSubtext, selectedDate === 'tomorrow' && styles.textBlack]}>{getDisplayDate('tomorrow')}</Text>
             </TouchableOpacity>
           </View>
 
-          <View style={styles.timeDisplay}>
-            <Text style={styles.timeText}>{time}</Text>
-            <View style={styles.ampmBadge}>
-              <Text style={styles.ampmText}>{ampm}</Text>
+          <TouchableOpacity 
+            style={styles.timeDisplay} 
+            onPress={() => setShowPicker(true)}
+          >
+            <Text style={styles.timeText}>{formatTime(date)}</Text>
+            <View style={styles.editBadge}>
+              <Ionicons name="pencil" size={14} color="#000" />
             </View>
-          </View>
+          </TouchableOpacity>
+
+          {showPicker && (
+            <DateTimePicker
+              value={date}
+              mode="time"
+              is24Hour={false}
+              display="spinner"
+              onChange={onTimeChange}
+              textColor="white" // For iOS
+            />
+          )}
         </View>
 
         {/* PROOF METHOD SECTION */}
@@ -168,13 +207,12 @@ const styles = StyleSheet.create({
   dateRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   dateBtn: { flex: 1, padding: 15, borderRadius: 15, backgroundColor: '#111', alignItems: 'center' },
   dateBtnActive: { backgroundColor: COLORS.primary },
-  dateBtnText: { color: '#666', fontWeight: 'bold', fontSize: 12 },
-  dateSubtext: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
+  dateBtnText: { color: '#666', fontWeight: 'bold', fontSize: 10 },
+  dateSubtext: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
   textBlack: { color: '#000' },
-  timeDisplay: { backgroundColor: '#111', padding: 20, borderRadius: 15, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 10, borderStyle: 'dashed', borderWidth: 1, borderColor: '#333' },
+  timeDisplay: { backgroundColor: '#111', padding: 25, borderRadius: 20, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 15, borderStyle: 'dashed', borderWidth: 1, borderColor: '#333' },
   timeText: { color: '#FFF', fontSize: 40, fontWeight: 'bold' },
-  ampmBadge: { backgroundColor: '#222', padding: 8, borderRadius: 8 },
-  ampmText: { color: '#FFF', fontWeight: 'bold' },
+  editBadge: { backgroundColor: COLORS.primary, padding: 5, borderRadius: 10 },
   methodItem: { flexDirection: 'row', alignItems: 'center', padding: 15, borderRadius: 15, backgroundColor: '#000', borderWidth: 1, borderColor: '#222' },
   methodActive: { borderColor: COLORS.primary, backgroundColor: '#0A1A0A' },
   methodTitle: { color: '#FFF', fontWeight: 'bold' },

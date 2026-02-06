@@ -38,6 +38,23 @@ const UserSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now
+  },
+  // Add these to your existing UserSchema
+  streak: {
+    type: Number,
+    default: 0
+  },
+  successRate: {
+    type: Number,
+    default: 100 // Starting at 100% success
+  },
+  totalTasksCompleted: {
+    type: Number,
+    default: 0
+  },
+  totalTasksFailed: {
+    type: Number,
+    default: 0
   }
 });
 

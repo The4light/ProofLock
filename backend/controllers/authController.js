@@ -71,3 +71,20 @@ exports.login = async (req, res, next) => {
     res.status(400).json({ success: false, error: error.message });
   }
 };
+
+// @desc    Get current logged in user (For Dashboard)
+// @route   GET /api/v1/auth/me
+// @access  Private
+exports.getMe = async (req, res, next) => {
+  try {
+    // req.user is already available because of the 'protect' middleware
+    const user = await User.findById(req.user.id);
+
+    res.status(200).json({
+      success: true,
+      data: user
+    });
+  } catch (error) {
+    next(error);
+  }
+};

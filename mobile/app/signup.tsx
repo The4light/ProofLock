@@ -1,23 +1,52 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, SafeAreaView, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/theme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import api from '../services/api';
 
 export default function SignUpScreen() {
   const router = useRouter();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSignUp = async () => {
+    if (!username || !email || !password) {
+      Alert.alert("Error", "Please fill in all fields");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Hits your POST /api/v1/auth/register
+      const response = await api.post('/auth/register', {
+        username,
+        email,
+        password
+      });
+
+      if (response.data.success) {
+        await AsyncStorage.setItem('userToken', response.data.token);
+        router.replace('/(tabs)');
+      }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.error || "Registration failed";
+      Alert.alert("Signup Error", errorMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <Text style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
         style={{ flex: 1 }}
       >
         <ScrollView contentContainerStyle={styles.content}>
-          {/* Back Button */}
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <Ionicons name="chevron-back" size={28} color="#FFF" />
           </TouchableOpacity>
@@ -26,12 +55,11 @@ export default function SignUpScreen() {
             <View style={styles.shieldIcon}>
               <Ionicons name="person-add" size={30} color="#39FF14" />
             </View>
-            <Text style={styles.title}>Sign up </Text>
+            <Text style={styles.title}>Sign up</Text>
             <Text style={styles.subtitle}>Start your journey toward absolute accountability.</Text>
           </View>
 
           <View style={styles.form}>
-            {/* Username Input - Critical for our Backend! */}
             <View style={styles.inputCard}>
               <Text style={styles.label}>USERNAME</Text>
               <TextInput
@@ -43,7 +71,6 @@ export default function SignUpScreen() {
               />
             </View>
 
-            {/* Email Input */}
             <View style={styles.inputCard}>
               <Text style={styles.label}>EMAIL ADDRESS</Text>
               <TextInput
@@ -57,7 +84,6 @@ export default function SignUpScreen() {
               />
             </View>
 
-            {/* Password Input */}
             <View style={styles.inputCard}>
               <Text style={styles.label}>PASSWORD</Text>
               <TextInput
@@ -70,13 +96,13 @@ export default function SignUpScreen() {
               />
             </View>
 
-            {/* Sign Up Button */}
             <TouchableOpacity 
-              style={styles.button} 
-              onPress={() => router.replace('/(tabs)')}
+              style={[styles.button, { opacity: loading ? 0.7 : 1 }]} 
+              onPress={handleSignUp}
+              disabled={loading}
             >
-              <Text style={styles.buttonText}>Create Account</Text>
-              <Ionicons name="checkmark-circle" size={20} color="#000" style={{ marginLeft: 8 }} />
+              <Text style={styles.buttonText}>{loading ? 'Creating...' : 'Create Account'}</Text>
+              {!loading && <Ionicons name="checkmark-circle" size={20} color="#000" style={{ marginLeft: 8 }} />}
             </TouchableOpacity>
           </View>
 
@@ -88,7 +114,7 @@ export default function SignUpScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </Text>
+    </SafeAreaView>
   );
 }
 

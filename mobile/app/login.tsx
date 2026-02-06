@@ -3,11 +3,28 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, SafeAreaView, Keyb
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/theme'; // Using your theme now
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import api from '../services/api';
 
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const handleLogin = async () => {
+  try {
+    const response = await api.post('/auth/login', { email, password });
+    
+    if (response.data.success) {
+      // 1. Save the token
+      await AsyncStorage.setItem('userToken', response.data.token);
+      
+      // 2. Go to Dashboard
+      router.replace('/(tabs)');
+    }
+  } catch (error: any) {
+    alert(error.response?.data?.error || "Login Failed");
+  }
+};
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: COLORS.background }]}>
@@ -58,7 +75,7 @@ export default function LoginScreen() {
 
             <TouchableOpacity 
               style={[styles.button, { backgroundColor: COLORS.primary }]} 
-              onPress={() => router.replace('/(tabs)')}
+              onPress={(handleLogin)}
             >
               <Text style={styles.buttonText}>Continue</Text>
               <Ionicons name="arrow-forward" size={20} color="#000" style={{ marginLeft: 8 }} />

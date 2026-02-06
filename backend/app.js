@@ -1,8 +1,9 @@
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
-const morgan = require('morgan'); // Optional: for logging requests
+const morgan = require('morgan');
 const authRoutes = require('./routes/authRoutes');
+const alarmRoutes = require('./routes/alarmRoutes');
 const errorHandler = require('./middleware/errorMiddleware');
 
 // Load env vars
@@ -10,23 +11,24 @@ dotenv.config();
 
 const app = express();
 
-// Body parser: allows us to receive JSON in req.body
+// 1. MIDDLEWARE (Must come first)
 app.use(express.json());
-app.use(errorHandler);
 app.use(cors());
 
-// Dev logging middleware (prints requests to your terminal)
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
-// Mount Routers
-// This means all routes in authRoutes will start with /api/v1/auth
+// 2. ROUTES
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/alarms', alarmRoutes);
 
-// Simple health check route
+// Simple health check
 app.get('/', (req, res) => {
   res.send('ProofLock API is running...');
 });
+
+// 3. ERROR HANDLER (Must be last)
+app.use(errorHandler);
 
 module.exports = app;

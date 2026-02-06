@@ -1,98 +1,99 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { COLORS } from '../../constants/theme'; // Adjust dots if needed!
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
-
-export default function HomeScreen() {
+export default function Dashboard() {
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.profilePic}>
+            <Text style={{fontSize: 20}}>👤</Text>
+          </View>
+          <View style={{flex: 1, marginLeft: 12}}>
+            <Text style={styles.greeting}>Good morning, Alex.</Text>
+            <Text style={styles.date}>Monday, October 23</Text>
+          </View>
+          <Ionicons name="settings-outline" size={24} color="white" />
+        </View>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+        {/* Stats Row */}
+        <View style={styles.statsRow}>
+          <View style={styles.statCard}>
+            <Text style={styles.statLabel}><Ionicons name="flame" color="#39FF14"/> STREAK</Text>
+            <Text style={styles.statValue}>5 Days</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statLabel}><Ionicons name="checkmark-circle" color="#39FF14"/> SUCCESS</Text>
+            <Text style={styles.statValue}>98%</Text>
+          </View>
+        </View>
+
+        {/* Alarms Section */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Todays Alarms</Text>
+          <Text style={styles.remainingText}>2 REMAINING</Text>
+        </View>
+
+        {/* Active Alarm Card */}
+        <View style={styles.alarmCard}>
+          <View style={styles.alarmIndicator} />
+          <View style={styles.alarmContent}>
+            <View style={styles.alarmTop}>
+              <View style={styles.tag}><Text style={styles.tagText}>UPCOMING</Text></View>
+              <Text style={styles.timeUntil}>Starts in 42m</Text>
+            </View>
+            <Text style={styles.alarmTime}>6:00 AM</Text>
+            <Text style={styles.alarmTitle}>Morning Workout</Text>
+            <View style={styles.proofRow}>
+               <Ionicons name="camera-outline" size={16} color="#888" />
+               <Text style={styles.proofText}> Proof: Photo of Gym</Text>
+            </View>
+          </View>
+          <TouchableOpacity style={styles.detailsBtn}>
+            <Text style={styles.detailsBtnText}>Details</Text>
+          </TouchableOpacity>
+        </View>
+
+      </ScrollView>
+
+      {/* Floating Add Button */}
+      <TouchableOpacity style={styles.fab}>
+        <Ionicons name="add" size={30} color="black" />
+      </TouchableOpacity>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
+  container: { flex: 1, backgroundColor: '#000' },
+  scrollContent: { padding: 20 },
+  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 30 },
+  profilePic: { width: 45, height: 45, borderRadius: 22.5, backgroundColor: '#333', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: COLORS.primary },
+  greeting: { color: '#FFF', fontSize: 24, fontWeight: 'bold' },
+  date: { color: '#666', fontSize: 14 },
+  statsRow: { flexDirection: 'row', gap: 15, marginBottom: 30 },
+  statCard: { flex: 1, backgroundColor: '#121212', padding: 20, borderRadius: 16 },
+  statLabel: { color: '#888', fontSize: 12, marginBottom: 8, fontWeight: '600' },
+  statValue: { color: '#FFF', fontSize: 22, fontWeight: 'bold' },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15, alignItems: 'flex-end' },
+  sectionTitle: { color: '#FFF', fontSize: 20, fontWeight: 'bold' },
+  remainingText: { color: COLORS.primary, fontSize: 12, fontWeight: 'bold' },
+  alarmCard: { backgroundColor: '#FFF', borderRadius: 20, flexDirection: 'row', padding: 15, alignItems: 'center' },
+  alarmIndicator: { width: 4, height: '80%', backgroundColor: COLORS.primary, borderRadius: 2 },
+  alarmContent: { flex: 1, paddingLeft: 15 },
+  alarmTop: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 5 },
+  tag: { backgroundColor: '#E0FFE0', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
+  tagText: { color: '#00A000', fontSize: 10, fontWeight: 'bold' },
+  timeUntil: { color: '#888', fontSize: 12 },
+  alarmTime: { fontSize: 28, fontWeight: '900', color: '#000' },
+  alarmTitle: { fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 10 },
+  proofRow: { flexDirection: 'row', alignItems: 'center' },
+  proofText: { color: '#888', fontSize: 14 },
+  detailsBtn: { backgroundColor: COLORS.primary, paddingVertical: 8, paddingHorizontal: 15, borderRadius: 8 },
+  detailsBtnText: { fontWeight: 'bold', fontSize: 14 },
+  fab: { position: 'absolute', bottom: 30, right: 30, width: 60, height: 60, borderRadius: 30, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center', elevation: 5 }
 });

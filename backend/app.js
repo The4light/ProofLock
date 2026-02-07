@@ -23,7 +23,7 @@ if (process.env.NODE_ENV === 'development') {
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/alarms', alarmRoutes);
 
-// Simple health check
+// Simple health checks
 app.get('/', (req, res) => {
   res.send('ProofLock API is running...');
 });

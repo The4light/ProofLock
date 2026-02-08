@@ -6,11 +6,13 @@ import { useRouter } from 'expo-router';
 import { COLORS } from '../../constants/theme';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
+import moment from 'moment'; // Recommended for easier time comparison
+import { Alarm } from '@/types/alarm';
 
 export default function Dashboard() {
   const router = useRouter();
   const { user } = useAuth();
-  const [alarms, setAlarms] = useState([]);
+  const [alarms, setAlarms] = useState<Alarm[]>([]); // 2. Set the type
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -31,6 +33,36 @@ export default function Dashboard() {
   useEffect(() => {
     fetchAlarms();
   }, []);
+  
+  useEffect(() => {
+    const checkAlarms = () => {
+      // Get current time in same format as our DB (e.g., "06:30 AM")
+      const currentTime = moment().format('hh:mm A'); 
+      
+      // Find an alarm that is 'upcoming' and matches the minute
+      const triggeringAlarm = alarms.find(alarm => 
+        alarm.status === 'upcoming' && alarm.startTime === currentTime
+      );
+
+      if (triggeringAlarm) {
+        console.log("DING DING DING! Alarm triggered:", triggeringAlarm.goal);
+        
+        // Navigate to the Active Alarm screen
+        router.push({
+          pathname: '/active-alarm',
+          params: { 
+            id: triggeringAlarm._id, 
+            goal: triggeringAlarm.goal 
+          }
+        });
+      }
+    };
+
+    // Check the clock every 10 seconds so we don't miss the minute
+    const interval = setInterval(checkAlarms, 10000);
+    
+    return () => clearInterval(interval);
+  }, [alarms]); // Re-runs watcher whenever the list of alarms updates
 
   const onRefresh = () => {
     setRefreshing(true);

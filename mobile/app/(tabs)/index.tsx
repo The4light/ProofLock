@@ -35,16 +35,12 @@ export default function Dashboard() {
   }, []);
   
 useEffect(() => {
-  const checkAlarms = () => {
-  // Get current hour and minute as numbers (e.g., 15 and 41)
+const checkAlarms = () => {
   const nowHour = moment().hour();
   const nowMinute = moment().minute();
 
-  console.log(`--- CHECKING ${nowHour}:${nowMinute} ---`);
-
-  alarms.forEach(a => {
-    // Convert the alarm string (like "3:41 PM") into a moment object
-    // 'LT' or 'h:mm A' handles those weird hidden spaces much better
+  alarms.forEach((a: Alarm) => {
+    // Parse the stored time string into numbers for safe comparison
     const alarmTime = moment(a.startTime, ['h:mm A', 'hh:mm A', 'LT']);
     const alarmHour = alarmTime.hour();
     const alarmMinute = alarmTime.minute();
@@ -52,13 +48,23 @@ useEffect(() => {
     const isTimeMatch = (nowHour === alarmHour && nowMinute === alarmMinute);
     const isStatusMatch = a.status === 'upcoming';
 
-    console.log(`Comparing Clock [${nowHour}:${nowMinute}] to Alarm [${alarmHour}:${alarmMinute}] | Match: ${isTimeMatch}`);
-
     if (isTimeMatch && isStatusMatch) {
-      console.log("🎯 TARGET LOCKED! Triggering navigation...");
+      // Only one log triggers at the exact match time
+      console.log(`✅ Connection Verified: Triggering "${a.goal}" at ${a.startTime}`);
+
+      // Update local state to 'active' to prevent multiple triggers in the same minute
+      const updatedAlarms: Alarm[] = alarms.map(alarm => 
+        alarm._id === a._id ? { ...alarm, status: 'active' as any } : alarm
+      );
+      setAlarms(updatedAlarms);
+
+      // Navigate to the active alarm screen
       router.push({
         pathname: '/active-alarm' as any,
-        params: { id: a._id, goal: a.goal }
+        params: { 
+          id: a._id, 
+          goal: a.goal 
+        }
       });
     }
   });

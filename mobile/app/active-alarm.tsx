@@ -4,10 +4,19 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient'; // npx expo install expo-linear-gradient
 import { COLORS } from '../constants/theme';
+import moment from 'moment'; 
 
 export default function ActiveAlarmScreen() {
   const router = useRouter();
   const { id, goal } = useLocalSearchParams();
+  const [displayTime, setDisplayTime] = React.useState(moment().format('hh:mm'));
+
+  React.useEffect(() => {
+    const t = setInterval(() => {
+      setDisplayTime(moment().format('hh:mm'));
+    }, 1000);
+    return () => clearInterval(t);
+  }, []);
 
   const handleOpenCamera = () => {
     // We will build this screen next!
@@ -30,7 +39,7 @@ export default function ActiveAlarmScreen() {
           </View>
 
           <View style={styles.mainDisplay}>
-            <Text style={styles.timeBig}>06:00</Text>
+            <Text style={styles.timeBig}>{displayTime}</Text>
             
             <View style={styles.goalContainer}>
               <Text style={styles.requirementText}>Required: Photo of your</Text>

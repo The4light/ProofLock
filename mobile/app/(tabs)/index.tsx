@@ -18,7 +18,7 @@ export default function Dashboard() {
 
   const fetchAlarms = async () => {
     try {
-     const response = await api.get('/alarms ');
+     const response = await api.get('/alarms');
       if (response.data.success) {
         setAlarms(response.data.data);
       }
@@ -34,35 +34,40 @@ export default function Dashboard() {
     fetchAlarms();
   }, []);
   
-  useEffect(() => {
-    const checkAlarms = () => {
-      // Get current time in same format as our DB (e.g., "06:30 AM")
-      const currentTime = moment().format('hh:mm A'); 
-      
-      // Find an alarm that is 'upcoming' and matches the minute
-      const triggeringAlarm = alarms.find(alarm => 
-        alarm.status === 'upcoming' && alarm.startTime === currentTime
-      );
+useEffect(() => {
+  const checkAlarms = () => {
+  // Get current hour and minute as numbers (e.g., 15 and 41)
+  const nowHour = moment().hour();
+  const nowMinute = moment().minute();
 
-      if (triggeringAlarm) {
-        console.log("DING DING DING! Alarm triggered:", triggeringAlarm.goal);
-        
-        // Navigate to the Active Alarm screen
-        router.push({
-          pathname: '/active-alarm',
-          params: { 
-            id: triggeringAlarm._id, 
-            goal: triggeringAlarm.goal 
-          }
-        });
-      }
-    };
+  console.log(`--- CHECKING ${nowHour}:${nowMinute} ---`);
 
-    // Check the clock every 10 seconds so we don't miss the minute
+  alarms.forEach(a => {
+    // Convert the alarm string (like "3:41 PM") into a moment object
+    // 'LT' or 'h:mm A' handles those weird hidden spaces much better
+    const alarmTime = moment(a.startTime, ['h:mm A', 'hh:mm A', 'LT']);
+    const alarmHour = alarmTime.hour();
+    const alarmMinute = alarmTime.minute();
+
+    const isTimeMatch = (nowHour === alarmHour && nowMinute === alarmMinute);
+    const isStatusMatch = a.status === 'upcoming';
+
+    console.log(`Comparing Clock [${nowHour}:${nowMinute}] to Alarm [${alarmHour}:${alarmMinute}] | Match: ${isTimeMatch}`);
+
+    if (isTimeMatch && isStatusMatch) {
+      console.log("🎯 TARGET LOCKED! Triggering navigation...");
+      router.push({
+        pathname: '/active-alarm' as any,
+        params: { id: a._id, goal: a.goal }
+      });
+    }
+  });
+};
+
+    // Check every 10 seconds
     const interval = setInterval(checkAlarms, 10000);
-    
     return () => clearInterval(interval);
-  }, [alarms]); // Re-runs watcher whenever the list of alarms updates
+  }, [alarms, router]);
 
   const onRefresh = () => {
     setRefreshing(true);

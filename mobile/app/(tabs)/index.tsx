@@ -18,7 +18,7 @@ export default function Dashboard() {
 
   const fetchAlarms = async () => {
     try {
-     const response = await api.get('/alarms');
+     const response = await api.get<any>('/alarms');
       if (response.data.success) {
         setAlarms(response.data.data);
       }

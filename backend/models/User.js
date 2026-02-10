@@ -52,9 +52,13 @@ const UserSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-  totalTasksFailed: {
+totalTasksFailed: {
     type: Number,
     default: 0
+  },
+  avatar: {
+    type: String,
+    default: 'https://res.cloudinary.com/dl4b62svx/image/upload/v1/default-avatar.png' // Or any placeholder
   }
 });
 

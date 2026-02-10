@@ -7,22 +7,47 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#39FF14', // Neon Green
-        tabBarInactiveTintColor: '#888',
+        tabBarActiveTintColor: COLORS.primary,
+        tabBarInactiveTintColor: 'rgba(255,255,255,0.4)',
         tabBarStyle: {
-          backgroundColor: '#000',
-          borderTopWidth: 0,
+          backgroundColor: '#0b120b', // Matching your dark theme
+          borderTopColor: '#222',
+          paddingBottom: 5,
+          height: 60,
         },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <Ionicons name="home" size={24} color={color} />,
+          title: 'Alarms',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="alarm-outline" size={size} color={color} />
+          ),
         }}
       />
-      {/* Make sure these files exist in (tabs) or delete these Tabs.Screen lines for now */}
+      
+      {/* HISTORY TAB ICON */}
+      <Tabs.Screen
+        name="history"
+        options={{
+          title: 'History',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="time-outline" size={size} color={color} />
+          ),
+        }}
+      />
+
+      {/* SETTINGS TAB ICON */}
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: 'Settings',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="settings-outline" size={size} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

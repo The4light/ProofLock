@@ -1,25 +1,23 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ImageBackground } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient'; // npx expo install expo-linear-gradient
+import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../constants/theme';
-import moment from 'moment'; 
+import moment from 'moment';
 
 export default function ActiveAlarmScreen() {
   const router = useRouter();
   const { id, goal } = useLocalSearchParams();
-  const [displayTime, setDisplayTime] = React.useState(moment().format('hh:mm'));
+  const [displayTime, setDisplayTime] = React.useState(moment().format('HH:mm'));
 
   React.useEffect(() => {
     const t = setInterval(() => {
-      setDisplayTime(moment().format('hh:mm'));
     }, 1000);
     return () => clearInterval(t);
   }, []);
 
   const handleOpenCamera = () => {
-    // We will build this screen next!
     router.push({
       pathname: '/camera-verification' as any,
       params: { id }
@@ -29,40 +27,48 @@ export default function ActiveAlarmScreen() {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['#051505', '#000000']}
+        colors={['#0A0A0A', '#000000']}
         style={styles.gradient}
       >
         <View style={styles.content}>
+          {/* TACTICAL HEADER */}
           <View style={styles.header}>
-            <Text style={styles.activeTag}>ACTIVE ALARM</Text>
-            <View style={styles.indicator} />
+            <Text style={styles.activeTag}>STRIKE WINDOW ACTIVE</Text>
+            <View style={[styles.indicator, { backgroundColor: COLORS.primary }]} />
           </View>
 
+          {/* MASSIVE TIME DISPLAY */}
           <View style={styles.mainDisplay}>
             <Text style={styles.timeBig}>{displayTime}</Text>
             
-            <View style={styles.goalContainer}>
-              <Text style={styles.requirementText}>Required: Photo of your</Text>
-              <Text style={styles.goalText}>{goal || 'Morning Routine'}</Text>
+            <View style={styles.dashedCard}>
+              <Text style={styles.requirementText}>REQUIRED OBJECTIVE</Text>
+              <Text style={[styles.goalText, { color: COLORS.primary }]}>
+                {goal?.toString().toUpperCase() || 'OBJECTIVE MISSING'}
+              </Text>
+              <View style={styles.proofBadge}>
+                <Ionicons name="camera" size={14} color="rgba(255,255,255,0.4)" />
+                <Text style={styles.proofBadgeText}>PHOTO PROOF REQUIRED</Text>
+              </View>
             </View>
-
-            <Text style={styles.infoText}>
-              The alarm will continue until proof is verified.
-            </Text>
           </View>
 
+          {/* FOOTER ACTIONS */}
           <View style={styles.footer}>
+            <Text style={styles.infoText}>
+              SYSTEM LOCKED UNTIL VERIFICATION IS RECEIVED
+            </Text>
+
             <TouchableOpacity 
-              style={styles.submitBtn}
+              style={[styles.submitBtn, { backgroundColor: COLORS.primary }]}
               onPress={handleOpenCamera}
             >
               <Ionicons name="camera" size={24} color="#000" />
-              <Text style={styles.submitBtnText}>SUBMIT PROOF</Text>
+              <Text style={styles.submitBtnText}>EXECUTE PROOF</Text>
             </TouchableOpacity>
 
-            <Text style={styles.enforcementText}>ACCOUNTABILITY ENFORCEMENT ACTIVE</Text>
-            <TouchableOpacity>
-               <Text style={styles.emergencyText}>EMERGENCY: DISMISS WITH PENALTY</Text>
+            <TouchableOpacity style={styles.emergencyBtn}>
+               <Text style={styles.emergencyText}>EMERGENCY OVERRIDE (12% PENALTY)</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -74,32 +80,42 @@ export default function ActiveAlarmScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   gradient: { flex: 1 },
-  content: { flex: 1, padding: 40, alignItems: 'center', justifyContent: 'space-between' },
-  header: { alignItems: 'center', marginTop: 20 },
-  activeTag: { color: '#32D74B', fontSize: 14, fontWeight: '900', letterSpacing: 2 },
-  indicator: { width: 40, height: 4, backgroundColor: '#32D74B', borderRadius: 2, marginTop: 10 },
+  content: { flex: 1, paddingHorizontal: 30, paddingVertical: 60, alignItems: 'center', justifyContent: 'space-between' },
+  header: { alignItems: 'center' },
+  activeTag: { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '900', letterSpacing: 3 },
+  indicator: { width: 60, height: 2, borderRadius: 1, marginTop: 15 },
+  
   mainDisplay: { alignItems: 'center', width: '100%' },
-  timeBig: { color: '#F2F2F7', fontSize: 120, fontWeight: 'bold', letterSpacing: -5 },
-  goalContainer: { alignItems: 'center', marginVertical: 30 },
-  requirementText: { color: '#FFF', fontSize: 24, fontWeight: '600', textAlign: 'center' },
-  goalText: { color: '#FFF', fontSize: 24, fontWeight: '900', textAlign: 'center', textDecorationLine: 'underline' },
-  infoText: { color: '#8E8E93', fontSize: 16, textAlign: 'center', paddingHorizontal: 20 },
-  footer: { width: '100%', alignItems: 'center', gap: 20, marginBottom: 20 },
-  submitBtn: { 
-    backgroundColor: '#32D74B', 
+  timeBig: { color: '#FFF', fontSize: 110, fontWeight: 'bold', letterSpacing: -4, marginBottom: 20 },
+  
+  dashedCard: { 
     width: '100%', 
-    padding: 22, 
-    borderRadius: 18, 
+    padding: 30, 
+    borderRadius: 24, 
+    borderStyle: 'dashed', 
+    borderWidth: 1, 
+    borderColor: '#333', 
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.02)'
+  },
+  requirementText: { color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: '900', letterSpacing: 1.5, marginBottom: 10 },
+  goalText: { fontSize: 28, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
+  proofBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#111', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 10 },
+  proofBadgeText: { color: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
+
+  infoText: { color: 'rgba(255,255,255,0.2)', fontSize: 11, textAlign: 'center', fontWeight: '600', marginBottom: 20, textTransform: 'uppercase', letterSpacing: 1 },
+  
+  footer: { width: '100%', alignItems: 'center' },
+  submitBtn: { 
+    width: '100%', 
+    padding: 24, 
+    borderRadius: 20, 
     flexDirection: 'row', 
     justifyContent: 'center', 
     alignItems: 'center', 
     gap: 12,
-    shadowColor: '#32D74B',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
   },
-  submitBtnText: { color: '#000', fontSize: 18, fontWeight: 'bold' },
-  enforcementText: { color: '#444', fontSize: 12, fontWeight: 'bold', letterSpacing: 1 },
-  emergencyText: { color: '#222', fontSize: 10, fontWeight: '600' }
+  submitBtnText: { color: '#000', fontSize: 16, fontWeight: '900', letterSpacing: 1 },
+  emergencyBtn: { marginTop: 25, padding: 10 },
+  emergencyText: { color: 'rgba(255,59,48,0.4)', fontSize: 10, fontWeight: '900', letterSpacing: 1 }
 });

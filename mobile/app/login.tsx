@@ -12,7 +12,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const handleLogin = async () => {
   try {
-    const response = await api.post('/auth/login', { email, password });
+    const response = await api.post<any>('/auth/login', { email, password });
     
     if (response.data.success) {
       // 1. Save the token

@@ -1,191 +1,283 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { COLORS } from '../../constants/theme';
-import { useAuth } from '../../hooks/useAuth';
 import api from '../../services/api';
-import moment from 'moment'; // Recommended for easier time comparison
-import { Alarm } from '@/types/alarm';
+import { useRouter } from 'expo-router';
 
-export default function Dashboard() {
+
+export default function DashboardScreen() {
   const router = useRouter();
-  const { user } = useAuth();
-  const [alarms, setAlarms] = useState<Alarm[]>([]); // 2. Set the type
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
 
-  const fetchAlarms = async () => {
+const [user, setUser] = useState<any>(null); // For the name/discipline
+  const [nextAlarm, setNextAlarm] = useState<any>(null);
+  const [stats, setStats] = useState({ remaining: 0, completed: 0, missed: 0 });
+  const [previewAlarms, setPreviewAlarms] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [countdown, setCountdown] = useState("");;
+
+
+  // 1. Unified Fetching
+  const fetchData = async () => {
     try {
-     const response = await api.get<any>('/alarms');
-      if (response.data.success) {
-        setAlarms(response.data.data);
+      const [alarmRes, userRes] = await Promise.all<any>([
+        api.get('/alarms?status=pending'),
+        api.get('/auth/me')
+      ]);
+
+      if (userRes.data.success) setUser(userRes.data.data);
+
+      if (alarmRes.data.success) {
+        const now = new Date();
+        const alarms = alarmRes.data.data;
+
+        // Filter and sort upcoming alarms
+        const futureAlarms = alarms
+          .filter((a: any) => new Date(a.time) > now)
+          .sort((a: any, b: any) => new Date(a.time).getTime() - new Date(b.time).getTime());
+
+        setNextAlarm(futureAlarms[0] || null);
+        setPreviewAlarms(futureAlarms.slice(1, 3));
+
+        setStats({
+          remaining: futureAlarms.length,
+          completed: alarms.filter((a: any) => a.status === 'completed').length,
+          missed: alarms.filter((a: any) => new Date(a.time) < now && a.status === 'pending').length
+        });
       }
     } catch (err) {
-      console.error("Failed to fetch alarms", err);
+      console.error("Dashboard fetch error", err);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   };
 
+  // 2. Initial Data Load
   useEffect(() => {
-    fetchAlarms();
+    fetchData();
   }, []);
-  
-useEffect(() => {
-const checkAlarms = () => {
-  const nowHour = moment().hour();
-  const nowMinute = moment().minute();
 
-  alarms.forEach((a: Alarm) => {
-    // Parse the stored time string into numbers for safe comparison
-    const alarmTime = moment(a.startTime, ['h:mm A', 'hh:mm A', 'LT']);
-    const alarmHour = alarmTime.hour();
-    const alarmMinute = alarmTime.minute();
-
-    const isTimeMatch = (nowHour === alarmHour && nowMinute === alarmMinute);
-    const isStatusMatch = a.status === 'upcoming';
-
-    if (isTimeMatch && isStatusMatch) {
-      // Only one log triggers at the exact match time
-      console.log(`✅ Connection Verified: Triggering "${a.goal}" at ${a.startTime}`);
-
-      // Update local state to 'active' to prevent multiple triggers in the same minute
-      const updatedAlarms: Alarm[] = alarms.map(alarm => 
-        alarm._id === a._id ? { ...alarm, status: 'active' as any } : alarm
-      );
-      setAlarms(updatedAlarms);
-
-      // Navigate to the active alarm screen
-      router.push({
-        pathname: '/active-alarm' as any,
-        params: { 
-          id: a._id, 
-          goal: a.goal 
-        }
-      });
+  // 3. The "Master" Alarm Timer (Handles Countdown + Trigger)
+  useEffect(() => {
+    if (!nextAlarm) {
+      setCountdown("");
+      return;
     }
-  });
-};
 
-    // Check every 10 seconds
-    const interval = setInterval(checkAlarms, 10000);
-    return () => clearInterval(interval);
-  }, [alarms, router]);
+    const timer = setInterval(() => {
+      const now = new Date().getTime();
+      const alarmTime = new Date(nextAlarm.time).getTime();
+      const diff = alarmTime - now;
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchAlarms();
-  };
-
-  if (loading) {
-    return (
-      <View style={[styles.container, { justifyContent: 'center' }]}>
-        <ActivityIndicator color={COLORS.primary} size="large" />
-      </View>
-    );
-  }
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
-      >
+      if (diff <= 0) {
+        setCountdown("DUE NOW");
+        clearInterval(timer);
+        // TRIGGER MISSION
+        router.push({
+          pathname: '/active-alarm',
+          params: { id: nextAlarm._id, goal: nextAlarm.title }
+        });
+      } else {
+        const h = Math.floor(diff / (1000 * 60 * 60));
+        const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const s = Math.floor((diff % (1000 * 60)) / 1000);
         
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.profilePic}>
-            <Text style={{fontSize: 20}}>👤</Text>
-          </View>
-          <View style={{flex: 1, marginLeft: 12}}>
-            <Text style={styles.greeting}>Good morning, {user?.username || 'User'}.</Text>
-            <Text style={styles.date}>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</Text>
-          </View>
-          <TouchableOpacity onPress={() => router.push('/settings' as any)}>
-            <Ionicons name="settings-outline" size={24} color="white" />
-          </TouchableOpacity>
-        </View>
+        // Show seconds if under 1 minute for extra intensity
+        if (h === 0 && m === 0) {
+          setCountdown(`${s}s`);
+        } else {
+          setCountdown(`${h > 0 ? h + 'h ' : ''}${m}m`);
+        }
+      }
+    }, 1000);
 
-        {/* Stats Row */}
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}><Ionicons name="flame" color={COLORS.primary}/> STREAK</Text>
-            <Text style={styles.statValue}>{user?.streak || 0} Days</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}><Ionicons name="checkmark-circle" color={COLORS.primary}/> SCORE</Text>
-            <Text style={styles.statValue}>{user?.behaviorScore || 100}</Text>
-          </View>
-        </View>
+    return () => clearInterval(timer);
+  }, [nextAlarm]);
 
-        {/* Alarms Section */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Todays Alarms</Text>
-          <Text style={styles.remainingText}>{alarms.length} TOTAL</Text>
+  
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
+      {/* HEADER SECTION */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.greeting}>Good morning, {user?.name || 'User'}</Text>
+          <Text style={styles.dateText}>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }).toUpperCase()}</Text>
         </View>
+        <TouchableOpacity><Ionicons name="ellipsis-vertical" size={24} color="rgba(255,255,255,0.4)" /></TouchableOpacity>
+      </View>
 
-        {/* Dynamic Alarm List */}
-        {alarms.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={{color: '#444'}}>No commitments set for today.</Text>
+      {/* QUICK STATS ROW - Using thin solid borders for these small boxes */}
+      <View style={styles.statsRow}>
+        <StatBox label="REMAINING" value={stats.remaining.toString().padStart(2, '0')} color="white" />
+        <StatBox label="COMPLETED" value={stats.completed.toString().padStart(2, '0')} color={COLORS.primary} />
+        <StatBox label="MISSED" value={stats.missed.toString().padStart(2, '0')} color="#FF3B30" />
+      </View>
+
+      {/* HERO SECTION - UPCOMING OBJECTIVE (Dashed Borders Here) */}
+      <View style={styles.heroContainer}>
+        <Text style={styles.sectionLabel}>UPCOMING OBJECTIVE</Text>
+        <View style={styles.heroCard}>
+        <Text style={styles.heroTime}>
+          {nextAlarm ? new Date(nextAlarm.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "--:--"}
+        </Text>
+          <Text style={styles.heroTitle}>
+            {nextAlarm ? nextAlarm.title : "SYSTEM CLEAR"}
+          </Text>
+        
+          <View style={styles.countdownRow}>
+            <Ionicons name="time-outline" size={16} color={COLORS.primary} />
+            <Text style={[styles.countdownText, {color: COLORS.primary}]}>STARTS IN {countdown}</Text>
           </View>
-        ) : (
-          alarms.map((alarm: any) => (
-            <TouchableOpacity key={alarm._id} style={styles.alarmCard}>
-              <View style={styles.alarmIndicator} />
-              <View style={styles.alarmContent}>
-                <View style={styles.alarmTop}>
-                  <View style={styles.tag}>
-                    <Text style={styles.tagText}>{alarm.status.toUpperCase()}</Text>
-                  </View>
-                  <Text style={styles.timeUntil}>
-                    {alarm.proofMethod === 'photo' ? 'Photo Required' : 'AI Chat Required'}
-                  </Text>
-                </View>
-                <Text style={styles.alarmTime}>{alarm.startTime}</Text>
-                <Text style={styles.alarmTitle}>{alarm.goal}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#CCC" />
+
+          <View style={styles.proofBtn}>
+          <Ionicons 
+            name={nextAlarm?.proofType === 'photo' ? "camera" : "barcode-outline"} 
+            size={18} 
+            color="rgba(255,255,255,0.6)" 
+          />
+          <Text style={styles.proofText}>
+            {nextAlarm 
+              ? `PROOF: ${nextAlarm.proofType?.toUpperCase()} REQUIRED` 
+              : "NO PROOF REQUIRED"}
+          </Text>
+        </View>
+        </View>
+      </View>
+
+         {/* --- START OF NEW UPCOMING SECTION --- */}
+        <View style={styles.previewSection}>
+          <View style={styles.previewHeader}>
+            <Text style={styles.previewLabel}>THE HORIZON</Text>
+            <TouchableOpacity onPress={() => router.push('/upcomingScreen')}>
+              <Text style={styles.viewAllText}>VIEW ALL →</Text>
             </TouchableOpacity>
-          ))
-        )}
+          </View>
 
-      </ScrollView>
+          {previewAlarms.length > 0 ? (
+            previewAlarms.map((alarm, index) => (
+              <View key={index} style={styles.previewItem}>
+                <View style={styles.previewLeft}>
+                  <Text style={styles.previewTime}>
+                    {new Date(alarm.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </Text>
+                  <Text style={styles.previewTitle} numberOfLines={1}>{alarm.title}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.2)" />
+              </View>
+            ))
+          ) : (
+            <View style={styles.noMoreBox}>
+              <Text style={styles.noMoreText}>NO OTHER THREATS DETECTED</Text>
+            </View>
+          )}
+        </View>
+        {/* --- END OF NEW UPCOMING SECTION --- */}
 
-      {/* Floating Add Button */}
-      <TouchableOpacity style={styles.fab} onPress={() => router.push('/modal' as any)}>
-        <Ionicons name="add" size={30} color="black" />
+      {/* DISCIPLINE PANEL (Dashed Borders) */}
+      <View style={styles.metricsCard}>
+        <View style={styles.metricHeader}>
+           <View>
+             <Text style={styles.metricSubLabel}>DISCIPLINE SCORE</Text>
+             <Text style={styles.metricMainValue}>{user?.disciplineScore || 100}%</Text>
+           </View>
+           <View style={{ alignItems: 'flex-end' }}>
+             <Text style={styles.metricSubLabel}>CURRENT STREAK</Text>
+             <Text style={[styles.metricMainValue, { color: COLORS.primary }]}>{user?.streak || 0} Days</Text>
+           </View>
+        </View>
+        
+        {/* Progress Bar */}
+        <View style={styles.progressTrack}>
+          <View 
+            style={[
+              styles.progressFill, 
+              { width: `${user?.disciplineScore ?? 0}%` } 
+            ]} 
+          />
+        </View>
+
+        <View style={styles.riskNotice}>
+            <Ionicons name="warning" size={14} color="#FF9500" />
+            <Text style={styles.riskText}>
+              {user?.disciplineScore < 50 
+                ? "CRITICAL STATUS. MISSION FAILURE IMMINENT. RECOVER DISCIPLINE IMMEDIATELY." 
+                : "HIGH RISK WINDOW DETECTED. MISSING THE NEXT OBJECTIVE WILL RESULT IN A 12% SCORE PENALTY."
+              }
+            </Text>
+         </View>
+      </View>
+
+      {/* CREATE NEW ALARM BUTTON (Dashed) */}
+      <TouchableOpacity style={styles.createBtn} onPress={() => router.push('/create-alarm')}>
+        <Ionicons name="add" size={24} color={COLORS.primary} />
+        <Text style={styles.createBtnText}>CREATE NEW ALARM</Text>
       </TouchableOpacity>
-    </SafeAreaView>
+    </ScrollView>
   );
 }
 
+// Sub-component for small stat boxes
+const StatBox = ({ label, value, color }: any) => (
+  <View style={styles.statBox}>
+    <Text style={styles.statLabel}>{label}</Text>
+    <Text style={[styles.statValue, { color }]}>{value}</Text>
+  </View>
+);
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
-  scrollContent: { padding: 20 },
-  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 30 },
-  profilePic: { width: 45, height: 45, borderRadius: 22.5, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: COLORS.primary },
-  greeting: { color: '#FFF', fontSize: 24, fontWeight: 'bold' },
-  date: { color: '#666', fontSize: 14 },
-  statsRow: { flexDirection: 'row', gap: 15, marginBottom: 30 },
-  statCard: { flex: 1, backgroundColor: '#0A0A0A', padding: 20, borderRadius: 16, borderWidth: 1, borderColor: '#111' },
-  statLabel: { color: '#888', fontSize: 12, marginBottom: 8, fontWeight: '600' },
-  statValue: { color: '#FFF', fontSize: 22, fontWeight: 'bold' },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15, alignItems: 'flex-end' },
-  sectionTitle: { color: '#FFF', fontSize: 20, fontWeight: 'bold' },
-  remainingText: { color: COLORS.primary, fontSize: 12, fontWeight: 'bold' },
-  alarmCard: { backgroundColor: '#FFF', borderRadius: 20, flexDirection: 'row', padding: 15, alignItems: 'center', marginBottom: 12 },
-  alarmIndicator: { width: 4, height: '80%', backgroundColor: COLORS.primary, borderRadius: 2 },
-  alarmContent: { flex: 1, paddingLeft: 15 },
-  alarmTop: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 5 },
-  tag: { backgroundColor: '#E0FFE0', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
-  tagText: { color: '#00A000', fontSize: 10, fontWeight: 'bold' },
-  timeUntil: { color: '#888', fontSize: 12 },
-  alarmTime: { fontSize: 28, fontWeight: '900', color: '#000' },
-  alarmTitle: { fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 4 },
-  emptyState: { padding: 40, alignItems: 'center', borderStyle: 'dashed', borderWidth: 1, borderColor: '#222', borderRadius: 20 },
-  fab: { position: 'absolute', bottom: 30, right: 30, width: 60, height: 60, borderRadius: 30, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center', elevation: 5 }
+  container: { flex: 1, backgroundColor: '#050505', paddingHorizontal: 20 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 60, marginBottom: 30 },
+  greeting: { color: 'white', fontSize: 28, fontWeight: 'bold' },
+  dateText: { color: 'rgba(255,255,255,0.3)', fontSize: 12, fontWeight: 'bold', letterSpacing: 1.5, marginTop: 4 },
+  
+  statsRow: { flexDirection: 'row', gap: 12, marginBottom: 30 },
+  statBox: { flex: 1, backgroundColor: '#111', padding: 15, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#222' },
+  statLabel: { color: 'rgba(255,255,255,0.3)', fontSize: 9, fontWeight: '900', marginBottom: 8 },
+  statValue: { fontSize: 22, fontWeight: 'bold' },
+
+  heroContainer: { marginBottom: 25 },
+  sectionLabel: { color: COLORS.primary, fontSize: 11, fontWeight: '900', letterSpacing: 2, textAlign: 'center', marginBottom: 15 },
+  // DASHED BORDER ADDED HERE
+  heroCard: { backgroundColor: '#0A0A0A', padding: 35, borderRadius: 24, alignItems: 'center', borderStyle: 'dashed', borderWidth: 1, borderColor: '#333' },
+  heroTime: { color: 'white', fontSize: 64, fontWeight: 'bold' },
+  heroAmPm: { fontSize: 24, color: 'rgba(255,255,255,0.3)' },
+  heroTitle: { color: 'white', fontSize: 20, marginTop: 5 },
+  countdownRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 25 },
+  countdownText: { color: 'rgba(255,255,255,0.4)', fontSize: 16 },
+  proofBtn: { backgroundColor: '#151515', flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 15, paddingHorizontal: 30, borderRadius: 12, marginTop: 25, width: '100%', justifyContent: 'center' },
+  proofText: { color: 'rgba(255,255,255,0.6)', fontWeight: '900', fontSize: 12, letterSpacing: 1 },
+
+  // DASHED BORDER ADDED HERE
+  metricsCard: { backgroundColor: '#0A0A0A', padding: 20, borderRadius: 20, borderStyle: 'dashed', borderWidth: 1, borderColor: '#333', marginBottom: 20 },
+  metricHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
+  metricSubLabel: { color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: '900' },
+  metricMainValue: { color: 'white', fontSize: 24, fontWeight: 'bold', marginTop: 4 },
+  progressTrack: { height: 6, backgroundColor: '#1A1A1A', borderRadius: 3, marginBottom: 20, overflow: 'hidden' },
+  progressFill: { height: '100%', backgroundColor: COLORS.primary },
+  riskNotice: { flexDirection: 'row', gap: 10, backgroundColor: 'rgba(255,149,0,0.05)', padding: 12, borderRadius: 8 },
+  riskText: { color: 'rgba(255,255,255,0.4)', fontSize: 10, flex: 1, lineHeight: 14 },
+
+  // DASHED BORDER ADDED HERE
+  createBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 25, borderRadius: 20, borderStyle: 'dashed', borderWidth: 1, borderColor: 'rgba(0,255,128,0.2)' },
+  createBtnText: { color: COLORS.primary, fontWeight: '900', letterSpacing: 1.5, fontSize: 14 },
+  previewSection: { marginBottom: 30 },
+  previewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
+  previewLabel: { color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
+  viewAllText: { color: COLORS.primary, fontSize: 11, fontWeight: 'bold' },
+  previewItem: { 
+    backgroundColor: '#111', 
+    padding: 16, 
+    borderRadius: 16, 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#1a1a1a'
+  },
+  previewLeft: { flexDirection: 'row', alignItems: 'center', gap: 15, flex: 1 },
+  previewTime: { color: 'white', fontWeight: 'bold', fontSize: 14 },
+  previewTitle: { color: 'rgba(255,255,255,0.4)', fontSize: 14, flex: 1 },
+  noMoreBox: { padding: 20, alignItems: 'center', backgroundColor: '#0A0A0A', borderRadius: 16, borderStyle: 'dashed', borderWidth: 1, borderColor: '#222' },
+  noMoreText: { color: 'rgba(255,255,255,0.2)', fontSize: 10, fontWeight: 'bold' },
 });

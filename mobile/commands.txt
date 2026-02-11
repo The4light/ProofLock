@@ -1,0 +1,21 @@
+Terminal One: Backend Server
+This starts your Node.js API. It connects to MongoDB and handles the Cloudinary logic we just stabilized.
+
+Bash
+cd backend
+npm run dev
+
+
+2. Terminal Two: Frontend (Expo)
+This starts the Metro Bundler. Since you are using Expo, this is what serves the React Native code to your device or emulator.
+
+Bash
+cd frontend
+npx expo start
+
+
+3. Terminal Three: Network Tunnel (Ngrok)
+Since you are testing on a real device, you need to expose your local port 5000 so the phone can talk to your laptop.
+
+Bash
+ngrok http --ngrok http --url=rosamaria-uncopiable-willfully.ngrok-free.dev 5000

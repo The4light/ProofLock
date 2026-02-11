@@ -53,7 +53,7 @@ export default function NewCommitmentModal() {
         finalDate.setDate(finalDate.getDate() + 1);
       }
 
-      const response = await api.post('/alarms', {
+      const response = await api.post<any>('/alarms', {
         goal,
         startTime: formatTime(finalDate),
         startDate: finalDate,

@@ -12,11 +12,11 @@ const AlarmSchema = new mongoose.Schema({
     trim: true
   },
   startTime: { 
-    type: String, // Matches the "06:30 AM" in your design
+    type: String,
     required: true
   },
   startDate: { 
-    type: Date, // Handles "Oct 24" vs "Oct 25" from your design
+    type: Date,
     required: true
   },
   proofMethod: { 
@@ -37,6 +37,14 @@ const AlarmSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   }
+}, {
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
+});
+
+// Add virtual 'time' field for frontend compatibility
+AlarmSchema.virtual('time').get(function() {
+  return this.startDate;
 });
 
 module.exports = mongoose.model('Alarm', AlarmSchema);

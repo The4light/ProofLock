@@ -4,24 +4,23 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../constants/theme';
 import api from '../../services/api';
 import { useRouter } from 'expo-router';
-
+import { useFocusEffect } from '@react-navigation/native';
 
 export default function DashboardScreen() {
   const router = useRouter();
 
-const [user, setUser] = useState<any>(null); // For the name/discipline
+  const [user, setUser] = useState<any>(null);
   const [nextAlarm, setNextAlarm] = useState<any>(null);
   const [stats, setStats] = useState({ remaining: 0, completed: 0, missed: 0 });
   const [previewAlarms, setPreviewAlarms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [countdown, setCountdown] = useState("");;
-
+  const [countdown, setCountdown] = useState("");
 
   // 1. Unified Fetching
   const fetchData = async () => {
     try {
       const [alarmRes, userRes] = await Promise.all<any>([
-        api.get('/alarms?status=pending'),
+        api.get('/alarms'),
         api.get('/auth/me')
       ]);
 
@@ -31,10 +30,23 @@ const [user, setUser] = useState<any>(null); // For the name/discipline
         const now = new Date();
         const alarms = alarmRes.data.data;
 
-        // Filter and sort upcoming alarms
+        console.log('📊 Raw alarms from backend:', alarms);
+
+        // CRITICAL FIX: Use startDate instead of time
         const futureAlarms = alarms
-          .filter((a: any) => new Date(a.time) > now)
-          .sort((a: any, b: any) => new Date(a.time).getTime() - new Date(b.time).getTime());
+          .filter((a: any) => {
+            const alarmTime = new Date(a.startDate);
+            const isFuture = alarmTime > now;
+            console.log(`⏰ Alarm "${a.goal}" - Time: ${alarmTime.toLocaleString()}, Future: ${isFuture}`);
+            return isFuture;
+          })
+          .sort((a: any, b: any) => {
+            const timeA = new Date(a.startDate).getTime();
+            const timeB = new Date(b.startDate).getTime();
+            return timeA - timeB;
+          });
+
+        console.log('✅ Future alarms:', futureAlarms.length);
 
         setNextAlarm(futureAlarms[0] || null);
         setPreviewAlarms(futureAlarms.slice(1, 3));
@@ -42,7 +54,10 @@ const [user, setUser] = useState<any>(null); // For the name/discipline
         setStats({
           remaining: futureAlarms.length,
           completed: alarms.filter((a: any) => a.status === 'completed').length,
-          missed: alarms.filter((a: any) => new Date(a.time) < now && a.status === 'pending').length
+          missed: alarms.filter((a: any) => {
+            const alarmTime = new Date(a.startDate);
+            return alarmTime < now && a.status === 'upcoming';
+          }).length
         });
       }
     } catch (err) {
@@ -57,7 +72,14 @@ const [user, setUser] = useState<any>(null); // For the name/discipline
     fetchData();
   }, []);
 
-  // 3. The "Master" Alarm Timer (Handles Countdown + Trigger)
+  // 3. REFRESH when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchData();
+    }, [])
+  );
+
+  // 4. The "Master" Alarm Timer (Handles Countdown + Trigger)
   useEffect(() => {
     if (!nextAlarm) {
       setCountdown("");
@@ -66,16 +88,21 @@ const [user, setUser] = useState<any>(null); // For the name/discipline
 
     const timer = setInterval(() => {
       const now = new Date().getTime();
-      const alarmTime = new Date(nextAlarm.time).getTime();
+      // CRITICAL FIX: Use startDate instead of time
+      const alarmTime = new Date(nextAlarm.startDate).getTime();
       const diff = alarmTime - now;
+
+      // console.log(`⏱️ Countdown check - Now: ${new Date(now).toLocaleString()}, Alarm: ${new Date(alarmTime).toLocaleString()}, Diff: ${diff}ms`);
 
       if (diff <= 0) {
         setCountdown("DUE NOW");
         clearInterval(timer);
+        console.log('🚨 ALARM TRIGGERED!');
+        
         // TRIGGER MISSION
         router.push({
           pathname: '/active-alarm',
-          params: { id: nextAlarm._id, goal: nextAlarm.title }
+          params: { id: nextAlarm._id, goal: nextAlarm.goal }
         });
       } else {
         const h = Math.floor(diff / (1000 * 60 * 60));
@@ -94,7 +121,6 @@ const [user, setUser] = useState<any>(null); // For the name/discipline
     return () => clearInterval(timer);
   }, [nextAlarm]);
 
-  
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
       {/* HEADER SECTION */}
@@ -106,84 +132,85 @@ const [user, setUser] = useState<any>(null); // For the name/discipline
         <TouchableOpacity><Ionicons name="ellipsis-vertical" size={24} color="rgba(255,255,255,0.4)" /></TouchableOpacity>
       </View>
 
-      {/* QUICK STATS ROW - Using thin solid borders for these small boxes */}
+      {/* QUICK STATS ROW */}
       <View style={styles.statsRow}>
         <StatBox label="REMAINING" value={stats.remaining.toString().padStart(2, '0')} color="white" />
         <StatBox label="COMPLETED" value={stats.completed.toString().padStart(2, '0')} color={COLORS.primary} />
         <StatBox label="MISSED" value={stats.missed.toString().padStart(2, '0')} color="#FF3B30" />
       </View>
 
-      {/* HERO SECTION - UPCOMING OBJECTIVE (Dashed Borders Here) */}
+      {/* HERO SECTION - UPCOMING OBJECTIVE */}
       <View style={styles.heroContainer}>
         <Text style={styles.sectionLabel}>UPCOMING OBJECTIVE</Text>
         <View style={styles.heroCard}>
-        <Text style={styles.heroTime}>
-          {nextAlarm ? new Date(nextAlarm.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "--:--"}
-        </Text>
+          {/* CRITICAL FIX: Use startDate instead of time */}
+          <Text style={styles.heroTime}>
+            {nextAlarm ? new Date(nextAlarm.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "--:--"}
+          </Text>
           <Text style={styles.heroTitle}>
-            {nextAlarm ? nextAlarm.title : "SYSTEM CLEAR"}
+            {nextAlarm ? nextAlarm.goal : "SYSTEM CLEAR"}
           </Text>
         
           <View style={styles.countdownRow}>
             <Ionicons name="time-outline" size={16} color={COLORS.primary} />
-            <Text style={[styles.countdownText, {color: COLORS.primary}]}>STARTS IN {countdown}</Text>
+            <Text style={[styles.countdownText, {color: COLORS.primary}]}>STARTS IN {countdown || "..."}</Text>
           </View>
 
           <View style={styles.proofBtn}>
-          <Ionicons 
-            name={nextAlarm?.proofType === 'photo' ? "camera" : "barcode-outline"} 
-            size={18} 
-            color="rgba(255,255,255,0.6)" 
-          />
-          <Text style={styles.proofText}>
-            {nextAlarm 
-              ? `PROOF: ${nextAlarm.proofType?.toUpperCase()} REQUIRED` 
-              : "NO PROOF REQUIRED"}
-          </Text>
-        </View>
+            <Ionicons 
+              name={nextAlarm?.proofMethod === 'photo' ? "camera" : "barcode-outline"} 
+              size={18} 
+              color="rgba(255,255,255,0.6)" 
+            />
+            <Text style={styles.proofText}>
+              {nextAlarm 
+                ? `PROOF: ${nextAlarm.proofMethod?.toUpperCase()} REQUIRED` 
+                : "NO PROOF REQUIRED"}
+            </Text>
+          </View>
         </View>
       </View>
 
-         {/* --- START OF NEW UPCOMING SECTION --- */}
-        <View style={styles.previewSection}>
-          <View style={styles.previewHeader}>
-            <Text style={styles.previewLabel}>THE HORIZON</Text>
-            <TouchableOpacity onPress={() => router.push('/upcomingScreen')}>
-              <Text style={styles.viewAllText}>VIEW ALL →</Text>
-            </TouchableOpacity>
-          </View>
-
-          {previewAlarms.length > 0 ? (
-            previewAlarms.map((alarm, index) => (
-              <View key={index} style={styles.previewItem}>
-                <View style={styles.previewLeft}>
-                  <Text style={styles.previewTime}>
-                    {new Date(alarm.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </Text>
-                  <Text style={styles.previewTitle} numberOfLines={1}>{alarm.title}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.2)" />
-              </View>
-            ))
-          ) : (
-            <View style={styles.noMoreBox}>
-              <Text style={styles.noMoreText}>NO OTHER THREATS DETECTED</Text>
-            </View>
-          )}
+      {/* UPCOMING SECTION */}
+      <View style={styles.previewSection}>
+        <View style={styles.previewHeader}>
+          <Text style={styles.previewLabel}>THE HORIZON</Text>
+          <TouchableOpacity onPress={() => router.push('/upcomingScreen')}>
+            <Text style={styles.viewAllText}>VIEW ALL →</Text>
+          </TouchableOpacity>
         </View>
-        {/* --- END OF NEW UPCOMING SECTION --- */}
 
-      {/* DISCIPLINE PANEL (Dashed Borders) */}
+        {previewAlarms.length > 0 ? (
+          previewAlarms.map((alarm, index) => (
+            <View key={index} style={styles.previewItem}>
+              <View style={styles.previewLeft}>
+                {/* CRITICAL FIX: Use startDate instead of time */}
+                <Text style={styles.previewTime}>
+                  {new Date(alarm.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+                <Text style={styles.previewTitle} numberOfLines={1}>{alarm.goal}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.2)" />
+            </View>
+          ))
+        ) : (
+          <View style={styles.noMoreBox}>
+            <Text style={styles.noMoreText}>NO OTHER THREATS DETECTED</Text>
+          </View>
+        )}
+      </View>
+
+      {/* DISCIPLINE PANEL */}
       <View style={styles.metricsCard}>
         <View style={styles.metricHeader}>
-           <View>
-             <Text style={styles.metricSubLabel}>DISCIPLINE SCORE</Text>
-             <Text style={styles.metricMainValue}>{user?.disciplineScore || 100}%</Text>
-           </View>
-           <View style={{ alignItems: 'flex-end' }}>
-             <Text style={styles.metricSubLabel}>CURRENT STREAK</Text>
-             <Text style={[styles.metricMainValue, { color: COLORS.primary }]}>{user?.streak || 0} Days</Text>
-           </View>
+          <View>
+            <Text style={styles.metricSubLabel}>DISCIPLINE SCORE</Text>
+            <Text style={styles.metricMainValue}>{user?.disciplineScore || 100}%</Text>
+          </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={styles.metricSubLabel}>CURRENT STREAK</Text>
+            <Text style={[styles.metricMainValue, { color: COLORS.primary }]}>{user?.streak || 0} Days</Text>
+          </View>
         </View>
         
         {/* Progress Bar */}
@@ -197,17 +224,17 @@ const [user, setUser] = useState<any>(null); // For the name/discipline
         </View>
 
         <View style={styles.riskNotice}>
-            <Ionicons name="warning" size={14} color="#FF9500" />
-            <Text style={styles.riskText}>
-              {user?.disciplineScore < 50 
-                ? "CRITICAL STATUS. MISSION FAILURE IMMINENT. RECOVER DISCIPLINE IMMEDIATELY." 
-                : "HIGH RISK WINDOW DETECTED. MISSING THE NEXT OBJECTIVE WILL RESULT IN A 12% SCORE PENALTY."
-              }
-            </Text>
-         </View>
+          <Ionicons name="warning" size={14} color="#FF9500" />
+          <Text style={styles.riskText}>
+            {user?.disciplineScore < 50 
+              ? "CRITICAL STATUS. MISSION FAILURE IMMINENT. RECOVER DISCIPLINE IMMEDIATELY." 
+              : "HIGH RISK WINDOW DETECTED. MISSING THE NEXT OBJECTIVE WILL RESULT IN A 12% SCORE PENALTY."
+            }
+          </Text>
+        </View>
       </View>
 
-      {/* CREATE NEW ALARM BUTTON (Dashed) */}
+      {/* CREATE NEW ALARM BUTTON */}
       <TouchableOpacity style={styles.createBtn} onPress={() => router.push('/create-alarm')}>
         <Ionicons name="add" size={24} color={COLORS.primary} />
         <Text style={styles.createBtnText}>CREATE NEW ALARM</Text>
@@ -237,7 +264,6 @@ const styles = StyleSheet.create({
 
   heroContainer: { marginBottom: 25 },
   sectionLabel: { color: COLORS.primary, fontSize: 11, fontWeight: '900', letterSpacing: 2, textAlign: 'center', marginBottom: 15 },
-  // DASHED BORDER ADDED HERE
   heroCard: { backgroundColor: '#0A0A0A', padding: 35, borderRadius: 24, alignItems: 'center', borderStyle: 'dashed', borderWidth: 1, borderColor: '#333' },
   heroTime: { color: 'white', fontSize: 64, fontWeight: 'bold' },
   heroAmPm: { fontSize: 24, color: 'rgba(255,255,255,0.3)' },
@@ -247,7 +273,6 @@ const styles = StyleSheet.create({
   proofBtn: { backgroundColor: '#151515', flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 15, paddingHorizontal: 30, borderRadius: 12, marginTop: 25, width: '100%', justifyContent: 'center' },
   proofText: { color: 'rgba(255,255,255,0.6)', fontWeight: '900', fontSize: 12, letterSpacing: 1 },
 
-  // DASHED BORDER ADDED HERE
   metricsCard: { backgroundColor: '#0A0A0A', padding: 20, borderRadius: 20, borderStyle: 'dashed', borderWidth: 1, borderColor: '#333', marginBottom: 20 },
   metricHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
   metricSubLabel: { color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: '900' },
@@ -257,7 +282,6 @@ const styles = StyleSheet.create({
   riskNotice: { flexDirection: 'row', gap: 10, backgroundColor: 'rgba(255,149,0,0.05)', padding: 12, borderRadius: 8 },
   riskText: { color: 'rgba(255,255,255,0.4)', fontSize: 10, flex: 1, lineHeight: 14 },
 
-  // DASHED BORDER ADDED HERE
   createBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 25, borderRadius: 20, borderStyle: 'dashed', borderWidth: 1, borderColor: 'rgba(0,255,128,0.2)' },
   createBtnText: { color: COLORS.primary, fontWeight: '900', letterSpacing: 1.5, fontSize: 14 },
   previewSection: { marginBottom: 30 },

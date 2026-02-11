@@ -43,33 +43,72 @@ export default function NewCommitmentModal() {
     }).toUpperCase();
   };
 
-  const handleCreateCommitment = async () => {
-    if (!goal) return Alert.alert("Hold up", "What is the goal for this commitment?");
+const handleCreateCommitment = async () => {
+  if (!goal) return Alert.alert("Hold up", "What is the goal?");
+  
+  setLoading(true);
+  try {
+    // Build the alarm date/time
+    const alarmDate = new Date();
     
-    setLoading(true);
-    try {
-      const finalDate = new Date(date);
-      if (selectedDate === 'tomorrow') {
-        finalDate.setDate(finalDate.getDate() + 1);
-      }
-
-      const response = await api.post<any>('/alarms', {
-        goal,
-        startTime: formatTime(finalDate),
-        startDate: finalDate,
-        proofMethod,
-        status: 'upcoming'
-      });
-
-      if (response.data.success) {
-        router.replace('/(tabs)');
-      }
-    } catch (error: any) {
-      Alert.alert("Error", error.response?.data?.error || "Could not save commitment");
-    } finally {
-      setLoading(false);
+    // Set the time from the picker
+    alarmDate.setHours(date.getHours());
+    alarmDate.setMinutes(date.getMinutes());
+    alarmDate.setSeconds(0);
+    alarmDate.setMilliseconds(0);
+    
+    // Add a day if tomorrow is selected
+    if (selectedDate === 'tomorrow') {
+      alarmDate.setDate(alarmDate.getDate() + 1);
     }
-  };
+
+    // CRITICAL FIX: Include timezone offset so backend knows this is local time
+    // Get timezone offset in minutes, then convert to hours
+    const timezoneOffset = -alarmDate.getTimezoneOffset(); // Negative because getTimezoneOffset returns opposite sign
+    const offsetHours = Math.floor(Math.abs(timezoneOffset) / 60);
+    const offsetMinutes = Math.abs(timezoneOffset) % 60;
+    const offsetSign = timezoneOffset >= 0 ? '+' : '-';
+    const offsetString = `${offsetSign}${String(offsetHours).padStart(2, '0')}:${String(offsetMinutes).padStart(2, '0')}`;
+    
+    const year = alarmDate.getFullYear();
+    const month = String(alarmDate.getMonth() + 1).padStart(2, '0');
+    const day = String(alarmDate.getDate()).padStart(2, '0');
+    const hours = String(alarmDate.getHours()).padStart(2, '0');
+    const minutes = String(alarmDate.getMinutes()).padStart(2, '0');
+    const seconds = String(alarmDate.getSeconds()).padStart(2, '0');
+    
+    // Build ISO string WITH timezone offset (e.g., 2026-02-11T10:19:00+01:00)
+    const localISOString = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${offsetString}`;
+
+    // console.log('🚀 Sending alarm data:', {
+    //   goal,
+    //   startDate: localISOString,
+    //   startTime: formatTime(alarmDate),
+    //   localTime: alarmDate.toString(),
+    //   now: new Date().toString(),
+    //   timeDiff: alarmDate.getTime() - new Date().getTime(),
+    //   hoursDiff: (alarmDate.getTime() - new Date().getTime()) / (1000 * 60 * 60),
+    //   offset: offsetString
+    // });
+
+    const response = await api.post<any>('/alarms', {
+      goal: goal,
+      startDate: localISOString, // Send the local time WITHOUT timezone conversion
+      startTime: formatTime(alarmDate),
+      proofMethod: proofMethod,
+      status: 'upcoming'
+    });
+
+    if (response.data.success) {
+      router.replace('/(tabs)');
+    }
+  } catch (error: any) {
+    const serverError = error.response?.data?.error || error.message;
+    Alert.alert("Validation Error", serverError);
+  } finally {
+    setLoading(false);
+  }
+};
 
   // UI Date Helper
   const getDisplayDate = (type: 'today' | 'tomorrow') => {
@@ -96,7 +135,7 @@ export default function NewCommitmentModal() {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Ionicons name="create-outline" size={20} color={COLORS.primary} />
-            <Text style={styles.cardTitle}>What’s the goal?</Text>
+            <Text style={styles.cardTitle}>Whats the goal?</Text>
           </View>
           <TextInput 
             style={styles.input}
@@ -149,7 +188,7 @@ export default function NewCommitmentModal() {
               is24Hour={false}
               display="spinner"
               onChange={onTimeChange}
-              textColor="white" // For iOS
+              textColor="white"
             />
           )}
         </View>

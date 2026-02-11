@@ -14,13 +14,12 @@ export default function HistoryScreen() {
     const completedDates = new Set(
       data
         .filter(a => a.status === 'completed')
-        .map(a => new Date(a.verifiedAt || a.updatedAt).toDateString())
+        .map(a => new Date(a.startDate).toDateString())
     );
 
     let currentStreak = 0;
     let checkDate = new Date();
 
-    // If they haven't done anything today, check starting from yesterday
     if (!completedDates.has(checkDate.toDateString())) {
       checkDate = subDays(checkDate, 1);
     }
@@ -34,13 +33,13 @@ export default function HistoryScreen() {
 
   const fetchHistory = async () => {
     try {
-      const response = await api.get<any>('/alarms?status=completed,missed');
+      setLoading(true);
+      const response = await api.get<any>('/alarms?status=completed,failed,missed');
       const data = response.data.data;
 
-      // Grouping Logic
+      // Grouping into sections (Today, Yesterday, etc.)
       const groups = data.reduce((acc: any, alarm: any) => {
-        const dateSource = alarm.verifiedAt || alarm.updatedAt || new Date();
-        const date = new Date(dateSource);
+        const date = new Date(alarm.startDate);
         if (isNaN(date.getTime())) return acc;
 
         let title = format(date, 'MMM dd, yyyy').toUpperCase();
@@ -54,18 +53,18 @@ export default function HistoryScreen() {
 
       setSections(Object.keys(groups).map(title => ({ title, data: groups[title] })));
       
-      // Real Stats Calculation
-      const completed = data.filter((a: any) => a.status === 'completed');
-      const rate = data.length > 0 ? Math.round((completed.length / data.length) * 100) : 0;
+      const completedTasks = data.filter((a: any) => a.status === 'completed');
+      const totalAttempted = data.length;
+      const rate = totalAttempted > 0 ? Math.round((completedTasks.length / totalAttempted) * 100) : 0;
       
       setStats({ 
         streak: calculateStreak(data), 
         rate: rate,
-        total: completed.length 
+        total: completedTasks.length 
       });
 
     } catch (err) {
-      console.error(err);
+      console.error("History fetch error:", err);
     } finally {
       setLoading(false);
     }
@@ -86,7 +85,6 @@ export default function HistoryScreen() {
         refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchHistory} tintColor={COLORS.primary} />}
         contentContainerStyle={{ paddingBottom: 40 }}
       >
-        {/* Real Stats Section */}
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
             <Text style={styles.statLabel}>CURRENT STREAK</Text>
@@ -98,42 +96,59 @@ export default function HistoryScreen() {
           </View>
         </View>
 
-        {/* Success Rate Sub-header */}
         <View style={styles.rateHighlight}>
           <Ionicons name="trending-up" size={16} color={COLORS.primary} />
           <Text style={styles.rateText}>Overall Success Rate: <Text style={{color: COLORS.primary}}>{stats.rate}%</Text></Text>
         </View>
 
         {sections.length === 0 && !loading && (
-          <Text style={styles.emptyText}>No records yet. Start your first goal!</Text>
+          <View style={styles.emptyContainer}>
+            <Ionicons name="calendar-outline" size={48} color="rgba(255,255,255,0.1)" />
+            <Text style={styles.emptyText}>No records yet. Start your first goal!</Text>
+          </View>
         )}
 
+        {/* FIXED: Loop through sections first, then loop through the data inside each section */}
         {sections.map((section) => (
           <View key={section.title} style={styles.sectionContainer}>
             <Text style={styles.sectionHeader}>{section.title}</Text>
-            {section.data.map((item: any) => (
-              <View key={item._id} style={[styles.card, item.status === 'missed' && styles.missedCard]}>
-                <View style={[styles.iconCircle, { 
-                  backgroundColor: item.status === 'completed' ? 'rgba(0, 255, 128, 0.1)' : 'rgba(255, 255, 255, 0.05)' 
-                }]}>
-                  <Ionicons 
-                    name={item.status === 'missed' ? "close" : "checkmark-sharp"} 
-                    size={20} 
-                    color={item.status === 'completed' ? COLORS.primary : 'rgba(255,255,255,0.3)'} 
-                  />
+            
+            {section.data.map((item: any) => {
+              const isSuccessfullyCompleted = item.status === 'completed';
+              const isFailure = item.status === 'missed' || item.status === 'failed';
+
+              return (
+                <View key={item._id} style={[styles.card, isFailure && styles.missedCard]}>
+                  <View style={[
+                    styles.iconCircle, 
+                    { backgroundColor: isSuccessfullyCompleted ? 'rgba(0, 255, 128, 0.1)' : 'rgba(255, 60, 60, 0.1)' }
+                  ]}>
+                    <Ionicons 
+                      name={isSuccessfullyCompleted ? "checkmark-sharp" : "close-outline"} 
+                      size={20} 
+                      color={isSuccessfullyCompleted ? COLORS.primary : '#FF3C3C'} 
+                    />
+                  </View>
+                  
+                  <View style={styles.cardInfo}>
+                    <Text style={styles.goalText} numberOfLines={1}>{item.goal || "Untitled Goal"}</Text>
+                    <Text style={styles.methodText}>
+                      {isSuccessfullyCompleted 
+                        ? "Verified • Photo Proof" 
+                        : `Missed • $${item.penalty || 10} Penalty`}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.timeContainer}>
+                    <Text style={styles.timeText}>{item.startTime || "00:00"}</Text>
+                    <View style={[
+                      styles.statusDot, 
+                      { backgroundColor: isSuccessfullyCompleted ? COLORS.primary : '#FF3C3C' }
+                    ]} />
+                  </View>
                 </View>
-                <View style={styles.cardInfo}>
-                  <Text style={styles.goalText}>{item.goal || "Untitled Goal"}</Text>
-                  <Text style={styles.methodText}>
-                    {item.status === 'completed' ? `Verified Proof` : `Missed Goal`}
-                  </Text>
-                </View>
-                <View style={styles.timeContainer}>
-                  <Text style={styles.timeText}>{item.time}</Text>
-                  <View style={[styles.statusDot, { backgroundColor: item.status === 'completed' ? COLORS.primary : '#333' }]} />
-                </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         ))}
       </ScrollView>
@@ -153,15 +168,16 @@ const styles = StyleSheet.create({
   rateHighlight: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#121612', padding: 12, borderRadius: 12, marginBottom: 25, alignSelf: 'flex-start', borderWidth: 1, borderColor: '#1f241f' },
   rateText: { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginLeft: 8, fontWeight: '600' },
   sectionContainer: { marginBottom: 25 },
-  sectionHeader: { color: 'rgba(255,255,255,0.3)', fontSize: 13, fontWeight: 'bold', letterSpacing: 1.5, marginBottom: 15 },
-  card: { backgroundColor: '#121612', flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 20, marginBottom: 12, borderWidth: 1, borderColor: '#1f241f' },
-  missedCard: { opacity: 0.6 },
-  iconCircle: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
+  sectionHeader: { color: 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: 'bold', letterSpacing: 1.5, marginBottom: 15 },
+  card: { backgroundColor: '#121612', flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 20, marginBottom: 10, borderWidth: 1, borderColor: '#1f241f' },
+  missedCard: { borderColor: 'rgba(255, 60, 60, 0.2)', opacity: 0.8 },
+  iconCircle: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   cardInfo: { flex: 1 },
-  goalText: { color: 'white', fontSize: 17, fontWeight: '600', marginBottom: 4 },
-  methodText: { color: 'rgba(255,255,255,0.4)', fontSize: 13 },
-  timeContainer: { alignItems: 'flex-end', justifyContent: 'center' },
-  timeText: { color: 'rgba(255,255,255,0.6)', fontSize: 13, marginBottom: 8 },
-  statusDot: { width: 8, height: 8, borderRadius: 4 },
-  emptyText: { color: 'gray', textAlign: 'center', marginTop: 50 }
+  goalText: { color: 'white', fontSize: 16, fontWeight: '600', marginBottom: 2 },
+  methodText: { color: 'rgba(255,255,255,0.4)', fontSize: 12 },
+  timeContainer: { alignItems: 'flex-end', justifyContent: 'center', minWidth: 70 },
+  timeText: { color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '600', marginBottom: 4 },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  emptyContainer: { alignItems: 'center', marginTop: 60, opacity: 0.5 },
+  emptyText: { color: 'gray', textAlign: 'center', marginTop: 12 }
 });

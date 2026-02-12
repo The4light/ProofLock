@@ -64,3 +64,35 @@ exports.updateAlarmStatus = async (req, res) => {
     res.status(400).json({ success: false, error: error.message });
   }
 };
+
+// Get a single alarm by ID
+exports.getAlarmById = async (req, res) => {
+  try {
+    const alarm = await Alarm.findById(req.params.id);
+
+    if (!alarm) {
+      return res.status(404).json({
+        success: false,
+        message: 'Alarm not found'
+      });
+    }
+
+    // Security check: Ensure this alarm belongs to the user asking for it
+    if (alarm.user.toString() !== req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authorized to view this alarm'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: alarm
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+};

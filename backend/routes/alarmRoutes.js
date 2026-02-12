@@ -1,5 +1,5 @@
 const express = require('express');
-const { createAlarm, getMyAlarms, updateAlarmStatus } = require('../controllers/alarmController');
+const { createAlarm, getMyAlarms, updateAlarmStatus, getAlarmById } = require('../controllers/alarmController');
 const { protect } = require('../middleware/authMiddleware');
 
 const router = express.Router();
@@ -13,5 +13,6 @@ router
   .post(createAlarm);
 
 router.patch('/:id/status', updateAlarmStatus); 
+router.route('/:id').get(protect, getAlarmById);
 
 module.exports = router;

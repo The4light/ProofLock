@@ -11,13 +11,35 @@ const AlarmSchema = new mongoose.Schema({
     required: [true, 'Please add a goal name'],
     trim: true
   },
+  category: { 
+    type: String, 
+    enum: ['Fitness', 'Study', 'Deep Work', 'General'], 
+    default: 'General' 
+  },
+  startDate: { 
+    type: Date, 
+    required: true 
+  },
+  endDate: { type: Date },
   startTime: { 
     type: String,
     required: true
   },
-  startDate: { 
-    type: Date,
-    required: true
+  protocol: [{
+    task: String,
+    completed: { type: Boolean, default: false }
+  }],
+  sessionReminders: { 
+    type: Boolean, 
+    default: true
+   },
+  afterActionReportEnabled: { 
+    type: Boolean, 
+    default: true
+   },
+  aarContent: { 
+    type: String, 
+    default: "" 
   },
   proofMethod: { 
     type: String, 
@@ -42,7 +64,6 @@ const AlarmSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Add virtual 'time' field for frontend compatibility
 AlarmSchema.virtual('time').get(function() {
   return this.startDate;
 });

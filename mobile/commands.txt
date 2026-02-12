@@ -18,4 +18,4 @@ npx expo start
 Since you are testing on a real device, you need to expose your local port 5000 so the phone can talk to your laptop.
 
 Bash
-ngrok http --ngrok http --url=rosamaria-uncopiable-willfully.ngrok-free.dev 5000
+ngrok http --url=rosamaria-uncopiable-willfully.ngrok-free.dev 5000

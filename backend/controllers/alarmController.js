@@ -5,22 +5,16 @@ const Alarm = require('../models/Alarm');
 // @access  Private
 exports.createAlarm = async (req, res) => {
   try {
-    // Automatically link the commitment to the logged-in user
     req.body.user = req.user.id;
+    req.body.type = 'basic'; // ← ADD THIS
 
     const alarm = await Alarm.create(req.body);
-
-    res.status(201).json({
-      success: true,
-      data: alarm
-    });
+    res.status(201).json({ success: true, data: alarm });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error.message
-    });
+    res.status(400).json({ success: false, error: error.message });
   }
 };
+
 
 // @desc    Get all commitments for the user
 // @route   GET /api/v1/alarms
@@ -96,3 +90,72 @@ exports.getAlarmById = async (req, res) => {
     });
   }
 };
+
+// backend/controllers/alarmController.js
+
+exports.createAdvancedAlarm = async (req, res) => {
+  try {
+    req.body.user = req.user.id;
+
+    // Combine first date + startTime so startDate isn't midnight
+    if (req.body.dates && req.body.dates.length > 0) {
+      const firstDate = req.body.dates[0];           // "2026-03-04"
+      const startTime = req.body.startTime || '00:00'; // "17:28"
+      const [hours, minutes] = startTime.split(':').map(Number);
+      
+      const combined = new Date(firstDate);
+      combined.setHours(hours, minutes, 0, 0);
+      req.body.startDate = combined;
+
+    } else if (req.body.isIndefinite) {
+      // Indefinite with no specific dates — use today + startTime
+      const startTime = req.body.startTime || '00:00';
+      const [hours, minutes] = startTime.split(':').map(Number);
+      const combined = new Date();
+      combined.setHours(hours, minutes, 0, 0);
+      req.body.startDate = combined;
+
+    } else {
+      req.body.startDate = new Date();
+    }
+
+    const alarmData = {
+      ...req.body,
+      type: 'advanced',
+      isRecurring: req.body.isIndefinite,
+      sessionReminders: req.body.remindersEnabled,
+      afterActionReportEnabled: req.body.aarEnabled
+    };
+
+    const alarm = await Alarm.create(alarmData);
+    res.status(201).json({ success: true, data: alarm });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+};
+    // Add this to your alarmController.js
+  exports.getAdvancedAlarm = async (req, res) => {
+    try {
+      const alarm = await Alarm.findOne({
+        _id: req.params.id,
+        user: req.user.id // Security: Ensure they can only see their own mission
+      });
+
+      if (!alarm) {
+        return res.status(404).json({
+          success: false,
+          error: 'Mission not found'
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: alarm
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: 'System failure retrieving mission data'
+      });
+    }
+  };

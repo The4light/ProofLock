@@ -10,7 +10,7 @@ npm run dev
 This starts the Metro Bundler. Since you are using Expo, this is what serves the React Native code to your device or emulator.
 
 Bash
-cd frontend
+cd mobile
 npx expo start
 
 

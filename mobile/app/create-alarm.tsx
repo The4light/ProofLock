@@ -28,11 +28,12 @@ export default function NewCommitmentModal() {
 
   // Time State
   const [date, setDate] = useState(new Date()); 
-  const [showPicker, setShowPicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [customDate, setCustomDate] = useState<Date | null>(null);
 
   const onTimeChange = (event: any, selectedDateValue?: Date) => {
-    setShowPicker(false); 
+    setShowTimePicker(false); // Close ONLY time
     if (selectedDateValue) {
       setDate(selectedDateValue);
     }
@@ -101,11 +102,11 @@ export default function NewCommitmentModal() {
     };
 
   // UI Date Helper
-  const getDisplayDate = (type: 'today' | 'tomorrow') => {
-    const d = new Date();
-    if (type === 'tomorrow') d.setDate(d.getDate() + 1);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
+    const getDisplayDate = (type: 'today' | 'tomorrow') => {
+      const d = new Date();
+      if (type === 'tomorrow') d.setDate(d.getDate() + 1);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    };
 
 
 
@@ -126,89 +127,171 @@ export default function NewCommitmentModal() {
   const [duration, setDuration] = useState('1h 30m');
   const [reminders, setReminders] = useState(true);
   const [aarEnabled, setAarEnabled] = useState(true);
-  const [protocol, setProtocol] = useState([
-    { id: 1, task: 'Drink 500ml Water' },
-    { id: 2, task: '3-Min Cold Shower' },
-    { id: 3, task: 'Journal Morning Intent' }
-  ]);
+  const [protocol, setProtocol] = useState([{ id: Date.now(), task: '' }]);
+  const [pickerMode, setPickerMode] = useState<'start' | 'end'>('start');
+  const [showAdvancedPicker, setShowAdvancedPicker] = useState(false);
+  
   
 
   // FUNCTIONS
-  const addProtocolStep = () => {
-    setProtocol([...protocol, { id: Date.now(), task: '' }]);
-  };
+    // Protocol constants
+    const addProtocolStep = () => {
+      setProtocol([...protocol, { id: Date.now(), task: '' }]);
+    };
+    //Protocol constants
+    const removeProtocolStep = (id: number) => {
+      // Never let the list go to zero, keep at least one empty box
+      if (protocol.length > 1) {
+        setProtocol(protocol.filter(p => p.id !== id));
+      } else {
+        setProtocol([{ id: Date.now(), task: '' }]);
+      }
+    };
 
-  const removeProtocolStep = (id: number) => {
-    setProtocol(protocol.filter(p => p.id !== id));
-  };
   // 2. RECURRENCE GENERATOR LOGIC
   // This generates the next 14 days for the horizontal scroll
-const getTimelineDays = (viewDate: Date) => {
-  const days = [];
-  const year = viewDate.getFullYear();
-  const month = viewDate.getMonth();
-  
-  // Get number of days in the selected month
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const getTimelineDays = (viewDate: Date) => {
+    const days = [];
+    const year = viewDate.getFullYear();
+    const month = viewDate.getMonth();
+    
+    // Get number of days in the selected month
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-  for (let i = 1; i <= daysInMonth; i++) {
-    const date = new Date(year, month, i);
-    days.push({
-      dayNumber: i,
-      dayName: date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(),
-      fullDate: date.toISOString().split('T')[0],
-    });
-  }
-  return days;
-};
-// 3. MONTH NAVIGATION LOGIC
-const changeMonth = (offset: number) => {
-  const newMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1);
-  setCurrentMonth(newMonth);
-};
-
-const timeline = getTimelineDays(currentMonth);
-const monthLabel = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase();
-
-const toggleDate = (fullDate: string) => {
-    if (selectedDates.includes(fullDate)) {
-      setSelectedDates(selectedDates.filter(d => d !== fullDate));
-    } else {
-      setSelectedDates([...selectedDates, fullDate]);
+    for (let i = 1; i <= daysInMonth; i++) {
+      const date = new Date(year, month, i);
+      days.push({
+        dayNumber: i,
+        dayName: date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(),
+        fullDate: date.toISOString().split('T')[0],
+      });
     }
+    return days;
   };
+  // 3. MONTH NAVIGATION LOGIC
+  const changeMonth = (offset: number) => {
+    const newMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1);
+    setCurrentMonth(newMonth);
+  };
+
+  const timeline = getTimelineDays(currentMonth);
+  const monthLabel = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase();
+
+  const toggleDate = (fullDate: string) => {
+      if (selectedDates.includes(fullDate)) {
+        setSelectedDates(selectedDates.filter(d => d !== fullDate));
+      } else {
+        setSelectedDates([...selectedDates, fullDate]);
+      }
+    };
 
     //HANDLE CREATE ADVANCED 
     const handleCreateAdvanced = async () => {
-      if (!goal) return Alert.alert("Mission Error", "What is the mission objective?");
-      if (selectedDates.length === 0) return Alert.alert("Timeline Error", "Pick at least one day.");
+      if (!goal) return Alert.alert("Mission Error", "Objective is required.");
+      
+      // Logical check: If not repeating, must have specific dates
+      if (!isIndefinite && selectedDates.length === 0) {
+        return Alert.alert("Timeline Error", "Pick at least one day.");
+      }
 
       setLoading(true);
       try {
-        const payload = {
-          goal,
-          category, // e.g., 'Fitness'
-          startTime, // '05:30'
-          endTime,   // '07:00'
-          dates: selectedDates, // Array of ['2026-02-12', '2026-02-13']
-          protocol: protocol.filter(p => p.task.trim() !== ''), // Clean empty tasks
-          remindersEnabled: reminders,
-          aarEnabled: aarEnabled,
-          isIndefinite: false, // We will add the toggle for this next
-          type: 'advanced'
-        };
 
+        const cleanedProtocol = protocol
+        .filter(step => step.task.trim() !== '')
+        .map(step => ({
+          task: step.task,
+          completed: false // Default state for the checklist
+        }));
+       const payload = {
+        goal,
+        category,
+        startTime: startTime, // Corrected variable name
+        endTime: endTime,     // Corrected variable name
+        dates: selectedDates,
+        protocol: cleanedProtocol
+          .filter(p => p.task.trim() !== '')
+          .map(p => ({ task: p.task, completed: false })),
+        remindersEnabled: reminders, // Changed to match controller
+        aarEnabled: aarEnabled,       // Changed to match controller
+        isIndefinite: isIndefinite,
+        type: 'advanced'
+      };
+
+        // The backend route we just built
         const response = await api.post<any>('/alarms/advanced', payload);
 
         if (response.data.success) {
           router.replace('/(tabs)');
         }
       } catch (error: any) {
-        Alert.alert("System Failure", error.response?.data?.error || "Check connection");
+        console.error("Advanced Mission Failure:", error);
+        Alert.alert("System Failure", error.response?.data?.error || "Server connection lost.");
       } finally {
         setLoading(false);
       }
     };
+
+
+    //Advanced Tab Functions 
+    // 1. Prepare the Protocol
+    const cleanedProtocol = protocol
+      .filter(p => p.task.trim() !== '') // Remove empty strings
+      .map(p => ({ task: p.task }));     // Strip the IDs, we don't need them in the DB
+
+    // 2. Log it to see if it's correct
+      console.log("PREPARING MISSION:", {
+        goal,
+        category,
+        startTime,
+        endTime,
+        dates: selectedDates, // These are your YYYY-MM-DD strings
+        protocol: cleanedProtocol,
+        isIndefinite
+      });
+    // Helper to calculate duration string
+    const calculateDuration = (start: string, end: string) => {
+        // Ensure we have strings to split
+              if (!start || !end) return;
+
+        const [sH, sM] = start.split(':').map(Number);
+        const [eH, eM] = end.split(':').map(Number);
+        
+        // Convert everything to total minutes
+        let startTotalMinutes = sH * 60 + sM;
+        let endTotalMinutes = eH * 60 + eM;
+
+        let diff = endTotalMinutes - startTotalMinutes;
+
+        // Handle overnight sessions (e.g., 11:00 PM to 1:00 AM)
+        if (diff < 0) {
+          diff += 24 * 60; 
+        }
+
+        const h = Math.floor(diff / 60);
+        const m = diff % 60;
+        
+        setDuration(`${h}h ${m}m`);
+      };
+
+    // 2. Use this uniquely named handler for the Advanced Tab
+    const onAdvancedTimeChange = (event: any, selectedDateValue?: Date) => {
+      setShowAdvancedPicker(false); // Close the advanced-specific picker
+      if (selectedDateValue) {
+        const hours = selectedDateValue.getHours().toString().padStart(2, '0');
+        const minutes = selectedDateValue.getMinutes().toString().padStart(2, '0');
+        const timeString = `${hours}:${minutes}`;
+
+        if (pickerMode === 'start') {
+          setStartTime(timeString);
+          calculateDuration(timeString, endTime);
+        } else {
+          setEndTime(timeString);
+          calculateDuration(startTime, timeString);
+        }
+      }
+    };
+
 
 
   return (
@@ -289,7 +372,7 @@ const toggleDate = (fullDate: string) => {
               {/* ADD THIS: CUSTOM DATE BUTTON */}
             <TouchableOpacity 
                 style={[styles.dateBtn, selectedDate === 'custom' && styles.dateBtnActive]}
-                onPress={() => setShowPicker(true)}
+                onPress={() => setShowDatePicker(true)}
               >
                 <Text style={[styles.dateBtnText, selectedDate === 'custom' && styles.textBlack]}>
                   {getCustomDateLabel()}
@@ -301,10 +384,10 @@ const toggleDate = (fullDate: string) => {
                 />
              </TouchableOpacity>
           </View>
-
+          {/*TIME DISPLAY TRIGGER*/}
           <TouchableOpacity 
             style={styles.timeDisplay} 
-            onPress={() => setShowPicker(true)}
+            onPress={() => setShowTimePicker(true)}
           >
             <Text style={styles.timeText}>{formatTime(date)}</Text>
             <View style={styles.editBadge}>
@@ -312,7 +395,7 @@ const toggleDate = (fullDate: string) => {
             </View>
           </TouchableOpacity>
 
-          {showPicker && (
+          {showTimePicker && (
             <DateTimePicker
               value={date}
               mode="time"
@@ -324,14 +407,14 @@ const toggleDate = (fullDate: string) => {
           )}
         </View>
         {/* ADD THIS: DATE PICKER MODAL */}
-        {showPicker && (
+        {showDatePicker && (
           <DateTimePicker
             value={customDate || new Date()}
             mode="date"
             minimumDate={new Date()} // Prevents picking past dates
             display={Platform.OS === 'ios' ? 'inline' : 'default'}
             onChange={(event, d) => {
-              setShowPicker(false);
+              setShowDatePicker(false);
               if (d) {
                 setCustomDate(d);
                 setSelectedDate('custom');
@@ -382,8 +465,24 @@ const toggleDate = (fullDate: string) => {
       {/* ADVANCED TAB */}
       {tab === 'advanced' && (
         <>
-          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          
+          {/* ADD THIS: MISSION OBJECTIVE SECTION */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="rocket-outline" size={20} color={COLORS.primary} />
+              <Text style={styles.cardLabel}>MISSION OBJECTIVE</Text>
+            </View>
+            <TextInput 
+              style={styles.input}
+              placeholder="Project Phoenix Deep Work"
+              placeholderTextColor="#444"
+              value={goal}
+              onChangeText={setGoal}
+            />
+          </View>
+
         {/* GOAL CONTEXT */}
         <Text style={styles.sectionLabel}>GOAL CONTEXT</Text>
            <ScrollView 
@@ -414,34 +513,66 @@ const toggleDate = (fullDate: string) => {
             ))}
           </ScrollView>
         {/* SESSION WINDOW */}
-        <View style={styles.card}>
-          <Text style={styles.cardLabel}>SESSION WINDOW</Text>
-          <View style={styles.timeRow}>
-            <View>
-              <Text style={styles.timeTitle}>START</Text>
-              <Text style={styles.timeValue}>{startTime}</Text>
-            </View>
-            <View style={styles.durationBadge}>
-              <View style={styles.durationLine} />
-              <Text style={styles.durationText}>{duration}</Text>
-              <View style={styles.durationLine} />
-            </View>
-            <View style={{alignItems: 'flex-end'}}>
-              <Text style={styles.timeTitle}>END</Text>
-              <Text style={styles.timeValue}>{endTime}</Text>
-            </View>
+      <View style={styles.card}>
+        <Text style={styles.cardLabel}>SESSION WINDOW</Text>
+        <View style={styles.timeRow}>
+          {/* START TIME */}
+          <TouchableOpacity 
+            onPress={() => {
+              setPickerMode('start');
+              setShowAdvancedPicker(true);
+            }}
+          >
+            <Text style={styles.timeTitle}>START</Text>
+            <Text style={styles.timeValue}>{startTime}</Text>
+          </TouchableOpacity>
+
+          {/* DURATION BADGE */}
+          <View style={styles.durationBadge}>
+            <View style={styles.durationLine} />
+            <Text style={styles.durationText}>{duration}</Text>
+            <View style={styles.durationLine} />
           </View>
-          
-          <View style={styles.divider} />
-          
-          <View style={styles.switchRow}>
-            <View style={styles.row}>
-              <Ionicons name="notifications-outline" size={22} color="white" />
-              <Text style={styles.switchLabel}>Session Reminders</Text>
-            </View>
-            <Switch value={reminders} onValueChange={setReminders} trackColor={{ true: COLORS.primary }} />
-          </View>
+
+          {/* END TIME */}
+          <TouchableOpacity 
+            style={{ alignItems: 'flex-end' }}
+            onPress={() => {
+              setPickerMode('end');
+              setShowAdvancedPicker(true);
+            }}
+          >
+            <Text style={styles.timeTitle}>END</Text>
+            <Text style={styles.timeValue}>{endTime}</Text>
+          </TouchableOpacity>
         </View>
+        
+        <View style={styles.divider} />
+        
+        <View style={styles.switchRow}>
+          <View style={styles.row}>
+            <Ionicons name="notifications-outline" size={22} color="white" />
+            <Text style={styles.switchLabel}>Session Reminders</Text>
+          </View>
+          <Switch 
+            value={reminders} 
+            onValueChange={setReminders} 
+            trackColor={{ true: COLORS.primary }} 
+          />
+        </View>
+
+        {/* THE PICKER - Fixed to match Basic Tab UX */}
+        {showAdvancedPicker && (
+          <DateTimePicker
+            value={new Date()} // Or use a helper to convert your startTime string to a Date object
+            mode="time"
+            is24Hour={false}   // Set to false for AM/PM like your Basic tab
+            display="spinner"  // This is what gives you the scrollable wheels
+            onChange={onAdvancedTimeChange}
+            textColor="white"  // Keeps it visible on your dark background
+          />
+        )}
+      </View>
 
         {/* CHECKLIST PROTOCOL */}
         <View style={styles.sectionHeader}>
@@ -592,18 +723,25 @@ const toggleDate = (fullDate: string) => {
           )}
         </View>
 
-        <TouchableOpacity style={styles.activateBtn}>
-          <Ionicons name="alarm-outline" size={22} color="black" />
-          <Text style={styles.activateText}>Activate Commitment</Text>
-        </TouchableOpacity>
+       <TouchableOpacity 
+        style={styles.activateBtn} 
+        onPress={handleCreateAdvanced} // 
+        disabled={loading} // [cite: 72]
+      >
+        <Ionicons name="alarm-outline" size={22} color="black" />
+        <Text style={styles.activateText}>
+          {loading ? 'CALCULATING MISSION...' : 'Activate Commitment'}
+        </Text>
+      </TouchableOpacity>
 
-      </ScrollView>
+        </ScrollView>
         </>
       )}
     </SafeAreaView>
   );
 }
 
+//Styles
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20 },

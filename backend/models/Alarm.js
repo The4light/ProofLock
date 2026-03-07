@@ -11,10 +11,21 @@ const AlarmSchema = new mongoose.Schema({
     required: [true, 'Please add a goal name'],
     trim: true
   },
+  // ── NEW: distinguishes basic from advanced on the dashboard
+  type: {
+    type: String,
+    enum: ['basic', 'advanced'],
+    default: 'basic'
+  },
   category: { 
     type: String, 
     enum: ['Fitness', 'Study', 'Deep Work', 'General'], 
     default: 'General' 
+  },
+  dates: [String],
+  isRecurring: { 
+    type: Boolean, 
+    default: false 
   },
   startDate: { 
     type: Date, 
@@ -22,21 +33,25 @@ const AlarmSchema = new mongoose.Schema({
   },
   endDate: { type: Date },
   startTime: { 
-    type: String,
-    required: true
+    type: String
+    // Not required globally — basic alarms don't use this
+  },
+  // ── NEW: advanced alarms send an endTime string e.g. "07:00"
+  endTime: {
+    type: String
   },
   protocol: [{
-    task: String,
+    task: { type: String, required: true },
     completed: { type: Boolean, default: false }
   }],
   sessionReminders: { 
     type: Boolean, 
     default: true
-   },
+  },
   afterActionReportEnabled: { 
     type: Boolean, 
     default: true
-   },
+  },
   aarContent: { 
     type: String, 
     default: "" 

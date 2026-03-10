@@ -97,22 +97,40 @@ exports.createAdvancedAlarm = async (req, res) => {
   try {
     req.body.user = req.user.id;
 
-    // Combine first date + startTime so startDate isn't midnight
-    if (req.body.dates && req.body.dates.length > 0) {
-      const firstDate = req.body.dates[0];           // "2026-03-04"
-      const startTime = req.body.startTime || '00:00'; // "17:28"
-      const [hours, minutes] = startTime.split(':').map(Number);
+    const parseLocalDateTime = (dateStr, timeStr) => {
+      // dateStr: "2026-03-10", timeStr: "17:28"
+      // Split manually to avoid UTC interpretation
+      const [year, month, day] = dateStr.split('-').map(Number);
+      const [hours, minutes] = (timeStr || '00:00').split(':').map(Number);
       
-      const combined = new Date(firstDate);
-      combined.setHours(hours, minutes, 0, 0);
-      req.body.startDate = combined;
+      // new Date(year, month-1, day, hours, minutes) = LOCAL time, no UTC shift
+      return new Date(year, month - 1, day, hours, minutes, 0, 0);
+    };
+
+    if (req.body.dates && req.body.dates.length > 0) {
+      const sortedDates = [...req.body.dates].sort();
+      const now = new Date();
+
+      // Find the first date+time combo that is still in the future
+      const nextFutureDate = sortedDates.find(dateStr => {
+        const dt = parseLocalDateTime(dateStr, req.body.startTime);
+        return dt > now;
+      });
+
+      // Use first future date, or fall back to the first date selected
+      const targetDate = nextFutureDate || sortedDates[0];
+      req.body.startDate = parseLocalDateTime(targetDate, req.body.startTime);
 
     } else if (req.body.isIndefinite) {
-      // Indefinite with no specific dates — use today + startTime
-      const startTime = req.body.startTime || '00:00';
-      const [hours, minutes] = startTime.split(':').map(Number);
+      const [hours, minutes] = (req.body.startTime || '00:00').split(':').map(Number);
+      const now = new Date();
       const combined = new Date();
       combined.setHours(hours, minutes, 0, 0);
+
+      // If today's time has already passed, schedule for tomorrow
+      if (combined <= now) {
+        combined.setDate(combined.getDate() + 1);
+      }
       req.body.startDate = combined;
 
     } else {

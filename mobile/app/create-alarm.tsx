@@ -150,41 +150,58 @@ export default function NewCommitmentModal() {
 
   // 2. RECURRENCE GENERATOR LOGIC
   // This generates the next 14 days for the horizontal scroll
-  const getTimelineDays = (viewDate: Date) => {
-    const days = [];
-    const year = viewDate.getFullYear();
-    const month = viewDate.getMonth();
-    
-    // Get number of days in the selected month
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
+const getTimelineDays = (viewDate: Date) => {
+  const days = [];
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-    for (let i = 1; i <= daysInMonth; i++) {
-      const date = new Date(year, month, i);
-      days.push({
-        dayNumber: i,
-        dayName: date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(),
-        fullDate: date.toISOString().split('T')[0],
-      });
-    }
-    return days;
-  };
-  // 3. MONTH NAVIGATION LOGIC
-  const changeMonth = (offset: number) => {
-    const newMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1);
-    setCurrentMonth(newMonth);
-  };
+  // Today at midnight for clean comparison
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  for (let i = 1; i <= daysInMonth; i++) {
+    const date = new Date(year, month, i);
+    date.setHours(0, 0, 0, 0);
+
+    if (date < today) continue; // Skip past dates
+
+    days.push({
+      dayNumber: i,
+      dayName: date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(),
+      // Build string manually — never use toISOString() (it shifts to UTC)
+      fullDate: `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`,
+    });
+  }
+  return days;
+};
+
+const changeMonth = (offset: number) => {
+  const newMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1);
+  const now = new Date();
+  // Block navigating to past months
+  if (newMonth < new Date(now.getFullYear(), now.getMonth(), 1)) return;
+  setCurrentMonth(newMonth);
+};
 
   const timeline = getTimelineDays(currentMonth);
   const monthLabel = currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase();
 
-  const toggleDate = (fullDate: string) => {
-      if (selectedDates.includes(fullDate)) {
-        setSelectedDates(selectedDates.filter(d => d !== fullDate));
-      } else {
-        setSelectedDates([...selectedDates, fullDate]);
-      }
-    };
+const toggleDate = (fullDate: string) => {
+  // Guard: parse manually and reject past dates
+  const [y, m, d] = fullDate.split('-').map(Number);
+  const picked = new Date(y, m - 1, d);
+  picked.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (picked < today) return; // Silently block
 
+  if (selectedDates.includes(fullDate)) {
+    setSelectedDates(selectedDates.filter(d => d !== fullDate));
+  } else {
+    setSelectedDates([...selectedDates, fullDate]);
+  }
+};
     //HANDLE CREATE ADVANCED 
     const handleCreateAdvanced = async () => {
       if (!goal) return Alert.alert("Mission Error", "Objective is required.");
@@ -217,7 +234,16 @@ export default function NewCommitmentModal() {
         isIndefinite: isIndefinite,
         type: 'advanced'
       };
-
+         // 2. Log it to see if it's correct
+      console.log("PREPARING MISSION:", {
+        goal,
+        category,
+        startTime,
+        endTime,
+        dates: selectedDates, // These are your YYYY-MM-DD strings
+        protocol: cleanedProtocol,
+        isIndefinite
+      });
         // The backend route we just built
         const response = await api.post<any>('/alarms/advanced', payload);
 
@@ -239,16 +265,7 @@ export default function NewCommitmentModal() {
       .filter(p => p.task.trim() !== '') // Remove empty strings
       .map(p => ({ task: p.task }));     // Strip the IDs, we don't need them in the DB
 
-    // 2. Log it to see if it's correct
-      console.log("PREPARING MISSION:", {
-        goal,
-        category,
-        startTime,
-        endTime,
-        dates: selectedDates, // These are your YYYY-MM-DD strings
-        protocol: cleanedProtocol,
-        isIndefinite
-      });
+   
     // Helper to calculate duration string
     const calculateDuration = (start: string, end: string) => {
         // Ensure we have strings to split

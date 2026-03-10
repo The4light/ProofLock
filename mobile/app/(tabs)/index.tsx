@@ -5,6 +5,7 @@ import { COLORS } from '../../constants/theme';
 import api from '../../services/api';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 // ─── HELPER: Get the next effective Date object from any alarm type ───────────
 function getEffectiveAlarmTime(alarm: any): Date | null {
@@ -142,6 +143,7 @@ export default function DashboardScreen() {
   const isAdvanced = (alarm: any) => alarm?.type === 'advanced';
 
   return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
 
       {/* HEADER */}
@@ -350,6 +352,15 @@ export default function DashboardScreen() {
       </TouchableOpacity>
 
     </ScrollView>
+    {/* THE FLOATING ACTION BUTTON */}
+    <TouchableOpacity 
+      style={styles.fab} 
+      activeOpacity={0.8}
+      onPress={() => router.push('/create-alarm')} // Or your modal route
+    >
+      <Ionicons name="add" size={32} color="#000" />
+    </TouchableOpacity>
+  </SafeAreaView>
   );
 }
 
@@ -463,4 +474,25 @@ const styles = StyleSheet.create({
   horizonAdvBadge: { width: 22, height: 22, borderRadius: 6, backgroundColor: 'rgba(0,255,128,0.08)', borderWidth: 1, borderColor: 'rgba(0,255,128,0.2)', justifyContent: 'center', alignItems: 'center' },
   noMoreBox: { padding: 20, alignItems: 'center', backgroundColor: '#0A0A0A', borderRadius: 16, borderStyle: 'dashed', borderWidth: 1, borderColor: '#222' },
   noMoreText: { color: 'rgba(255,255,255,0.2)', fontSize: 10, fontWeight: 'bold' },
+
+  //floating action button
+ fab: {
+    position: 'absolute',
+    bottom: 25, 
+    right: 20, 
+    // FOCAL COLOR: Mid-shade Teal (High tech, steady feel)
+    backgroundColor: 'rgb(13, 229, 204)', 
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#008080', // Matching shadow for a subtle "glow" effect
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.2)', // Light border to define the edge
+  },
 });
